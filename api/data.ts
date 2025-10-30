@@ -31,7 +31,7 @@ export default async function handler(
       parkedOrders,
     ] = await Promise.all([
       sql`SELECT * FROM products ORDER BY id ASC`,
-      sql`SELECT * FROM users ORDER BY id ASC`,
+      sql`SELECT * FROM users WHERE "deleted_at" IS NULL ORDER BY id ASC`,
       sql`SELECT * FROM roles ORDER BY id ASC`,
       sql`SELECT * FROM suppliers ORDER BY id ASC`,
       sql`SELECT * FROM customers ORDER BY id ASC`,

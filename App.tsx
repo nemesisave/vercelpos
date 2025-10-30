@@ -157,9 +157,15 @@ const App: React.FC = () => {
     }
   }, [addAuditLog]);
 
-  const handleAddNewUser = async (newUserData: NewUserPayload) => {
+  const handleAddNewUser = async (newUserData: Omit<NewUserPayload, 'creatorId' | 'creatorName'>) => {
+    if (!currentUser) return;
     try {
-        const newUser = await api.addUser(newUserData);
+        const payload: NewUserPayload = {
+            ...newUserData,
+            creatorId: currentUser.id,
+            creatorName: currentUser.name,
+        };
+        const newUser = await api.addUser(payload);
         setUsers(prev => [...prev, newUser]);
         addAuditLog('ADD_USER', `Added new user: ${newUser.name}`);
     } catch (error) {
@@ -177,6 +183,21 @@ const App: React.FC = () => {
         addAuditLog('UPDATE_USER', `Updated user: ${updatedUser.name}`);
     } catch (error) {
         alert(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!currentUser) return;
+    if (currentUser.id === userId) {
+      alert("You cannot delete your own account.");
+      return;
+    }
+    try {
+        await api.deleteUser(userId, { adminUserId: currentUser.id, adminUserName: currentUser.name });
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        addAuditLog('DELETE_USER', `Deleted user ID: ${userId}`);
+    } catch (error) {
+        alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -513,7 +534,7 @@ const App: React.FC = () => {
         const newSession = await api.openSession({
             startingCash,
             openedBy: user.name,
-            openedAt: new Date().toLocaleString(language),
+            openedAt: new Date().toISOString(),
             userId: user.id
         });
         setCurrentSession(newSession);
@@ -529,7 +550,7 @@ const App: React.FC = () => {
         const closedSession = await api.closeSession(currentSession.id, {
             countedCash,
             closedBy: currentUser.name,
-            closedAt: new Date().toLocaleString(language),
+            closedAt: new Date().toISOString(),
             userId: currentUser.id
         });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
@@ -545,7 +566,7 @@ const App: React.FC = () => {
     if (!currentSession || !currentUser) return;
     const fullActivity: CashDrawerActivity = {
         ...activity,
-        timestamp: new Date().toLocaleString(language),
+        timestamp: new Date().toISOString(),
     };
     try {
         const updatedSession = await api.addSessionActivity(currentSession.id, fullActivity, currentUser.id, currentUser.name);
@@ -688,6 +709,7 @@ const App: React.FC = () => {
             onAddUser={handleAddNewUser}
             onUpdateUser={handleUpdateUser}
             onUpdateUserStatus={handleUpdateUserStatus}
+            onDeleteUser={handleDeleteUser}
             onAddRole={handleAddRole}
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}

@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const result = await sql`
         INSERT INTO purchase_orders (id, "supplierId", "supplierName", date, items, "totalCost", status)
-        VALUES (${poId}, ${supplierId}, ${supplierName}, ${new Date().toLocaleDateString()}, ${JSON.stringify(fullItems)}, ${totalCost}, 'Ordered')
+        VALUES (${poId}, ${supplierId}, ${supplierName}, ${new Date().toISOString()}, ${JSON.stringify(fullItems)}, ${totalCost}, 'Ordered')
         RETURNING *;
       `;
       

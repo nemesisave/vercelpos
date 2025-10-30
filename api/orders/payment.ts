@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql, ensureDbInitialized } from '../_db.js';
 import { OrderItem, BusinessSettings, PaymentMethod, CompletedOrder } from '../../types.js';
+import { db } from '@vercel/postgres';
 
 export default async function handler(
   req: VercelRequest,
@@ -33,8 +34,9 @@ export default async function handler(
     userId: number,
   };
 
+  const client = await db.connect();
   try {
-    await sql`BEGIN`;
+    await client.query('BEGIN');
 
     // 1. Calculate totals
     const subtotal = orderItems.reduce((acc, item) => {
@@ -48,12 +50,13 @@ export default async function handler(
     // 2. Update product stock
     const updatedProducts: { id: number; stock: number }[] = [];
     for (const item of orderItems) {
-      const result = await sql`
-        UPDATE products
-        SET stock = stock - ${item.quantity}
-        WHERE id = ${item.id} AND stock >= ${item.quantity}
-        RETURNING id, stock;
-      `;
+      const result = await client.query(
+        `UPDATE products
+         SET stock = stock - $1
+         WHERE id = $2 AND stock >= $1
+         RETURNING id, stock;`,
+        [item.quantity, item.id]
+      );
       if (result.rowCount === 0) {
         throw new Error(`Insufficient stock for product ID ${item.id}`);
       }
@@ -62,7 +65,7 @@ export default async function handler(
 
     // 3. Create completed order
     const newOrder: Omit<CompletedOrder, 'invoiceId'> = {
-        date: new Date().toLocaleString(),
+        date: new Date().toISOString(),
         cashier: cashierName,
         items: orderItems,
         subtotal, tax, tip, discount, total, paymentMethod,
@@ -72,25 +75,28 @@ export default async function handler(
     };
     const invoiceId = `INV-${Date.now()}`;
     
-    await sql`
-        INSERT INTO completed_orders ("invoiceId", date, cashier, items, subtotal, tax, tip, discount, total, "paymentMethod", status, "customerId", "customerName")
-        VALUES (${invoiceId}, ${newOrder.date}, ${newOrder.cashier}, ${JSON.stringify(newOrder.items)}, ${newOrder.subtotal}, ${newOrder.tax}, ${newOrder.tip}, ${newOrder.discount}, ${newOrder.total}, ${newOrder.paymentMethod}, ${newOrder.status}, ${newOrder.customerId}, ${newOrder.customerName});
-    `;
+    await client.query(
+      `INSERT INTO completed_orders ("invoiceId", date, cashier, items, subtotal, tax, tip, discount, total, "paymentMethod", status, "customerId", "customerName")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);`,
+      [invoiceId, newOrder.date, newOrder.cashier, JSON.stringify(newOrder.items), newOrder.subtotal, newOrder.tax, newOrder.tip, newOrder.discount, newOrder.total, newOrder.paymentMethod, newOrder.status, newOrder.customerId, newOrder.customerName]
+    );
 
     const fullNewOrder: CompletedOrder = { ...newOrder, invoiceId };
 
     // 4. Audit log
-    await sql`
-        INSERT INTO audit_logs (user_id, user_name, action, details)
-        VALUES (${userId}, ${cashierName}, 'PROCESS_PAYMENT', ${`Processed payment for order ${invoiceId}, Total: ${fullNewOrder.total}`});
-    `;
+    await client.query(
+      `INSERT INTO audit_logs (user_id, user_name, action, details)
+       VALUES ($1, $2, 'PROCESS_PAYMENT', $3);`,
+      [userId, cashierName, `Processed payment for order ${invoiceId}, Total: ${fullNewOrder.total}`]
+    );
 
-    await sql`COMMIT`;
-
+    await client.query('COMMIT');
     res.status(200).json({ updatedProducts, newOrder: fullNewOrder });
   } catch (error) {
-    await sql`ROLLBACK`;
+    await client.query('ROLLBACK');
     console.error('Error processing payment:', error);
     res.status(500).json({ error: (error as Error).message });
+  } finally {
+    client.release();
   }
 }

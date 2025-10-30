@@ -11,15 +11,6 @@ if (!process.env.DATABASE_URL) {
 // Use the vercelSql export for general queries, as it handles connection pooling.
 export const sql = vercelSql;
 
-/**
- * Executes a block of queries. NOTE: Per user request to fix build, this is NOT a real transaction.
- * @param callback A function that receives a sql client.
- */
-export async function withTx<T>(callback: (sql: typeof vercelSql) => Promise<T>): Promise<T> {
-    return callback(sql);
-}
-
-
 export const schemaSql = `
 CREATE TABLE IF NOT EXISTS business_settings (
     id SERIAL PRIMARY KEY,
@@ -68,7 +59,8 @@ CREATE TABLE IF NOT EXISTS users (
     pin TEXT,
     "avatarUrl" TEXT,
     status TEXT,
-    "lastLogin" TIMESTAMPTZ
+    "lastLogin" TIMESTAMPTZ,
+    "deleted_at" TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -167,6 +159,24 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action TEXT,
     details TEXT
 );
+
+CREATE TABLE IF NOT EXISTS inventory_counts (
+    id SERIAL PRIMARY KEY,
+    user_id INT,
+    user_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS inventory_count_items (
+    id SERIAL PRIMARY KEY,
+    count_id INT REFERENCES inventory_counts(id) ON DELETE CASCADE,
+    product_id INT,
+    product_name TEXT,
+    expected_stock NUMERIC,
+    counted_stock NUMERIC,
+    difference NUMERIC
+);
 `;
 
 const MOCK_ROLES = [
@@ -264,6 +274,9 @@ export async function ensureDbInitialized() {
     await sql`ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;`;
     await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
 
+    // Ensure users table has soft delete column
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMPTZ;`;
+    
     // Ensure audit_logs table has the correct snake_case columns
     await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INT;`;
     await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name TEXT;`;

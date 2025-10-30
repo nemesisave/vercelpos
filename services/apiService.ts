@@ -91,6 +91,15 @@ export const updateUser = async (userId: number, updates: UserUpdatePayload): Pr
   return handleResponse<User>(response);
 };
 
+export const deleteUser = async (userId: number, adminInfo: { adminUserId: number, adminUserName: string }): Promise<{ success: boolean }> => {
+    const response = await fetch(`/api/users/${userId}`, { 
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adminInfo)
+    });
+    return handleResponse<{ success: boolean }>(response);
+};
+
 
 // --- CUSTOMERS ---
 export const addCustomer = async (customerData: NewCustomerPayload): Promise<Customer> => {
@@ -308,4 +317,18 @@ export const closeSession = async (sessionId: number, closingData: { countedCash
         body: JSON.stringify(closingData),
     });
     return handleResponse<CashDrawerSession>(response);
+};
+
+// --- INVENTORY COUNT ---
+export const saveInventoryCount = async (countData: {
+    userId: number;
+    userName: string;
+    counts: { productId: number; counted: number }[];
+}): Promise<{ updatedProducts: Product[] }> => {
+    const response = await fetch('/api/inventory/count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(countData),
+    });
+    return handleResponse<{ updatedProducts: Product[] }>(response);
 };

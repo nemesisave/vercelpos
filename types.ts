@@ -75,6 +75,7 @@ export interface User {
   avatarUrl: string;
   status: 'active' | 'inactive';
   lastLogin?: string;
+  deleted_at?: string;
 }
 
 export interface NewUserPayload {
@@ -83,6 +84,8 @@ export interface NewUserPayload {
   password: string;
   pin: string;
   roleId: string;
+  creatorId: number;
+  creatorName: string;
 }
 
 export interface UserUpdatePayload {
