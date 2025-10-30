@@ -1,11 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '../_db.js';
-import { ParkedOrder } from '../../types.js';
+import { ParkedOrder, OrderItem } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     try {
-      const { name, items } = req.body as { name: string, items: any[] };
+      const { name, items } = req.body as { name: string, items: OrderItem[] };
 
       if (!name || !items || items.length === 0) {
         return res.status(400).json({ error: 'Missing required fields' });

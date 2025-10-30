@@ -14,6 +14,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId: number;
     };
     
+    // Check for an existing open session
+    const openSession = await sql`SELECT id FROM session_history WHERE "isOpen" = true`;
+    if (openSession.rowCount > 0) {
+      return res.status(409).json({ error: 'An open session already exists.' });
+    }
+
     const result = await sql`
       INSERT INTO session_history ("isOpen", "startingCash", "openedBy", "openedAt", activities)
       VALUES (true, ${startingCash}, ${openedBy}, ${openedAt}, '[]')

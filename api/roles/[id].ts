@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const result = await sql`
             UPDATE roles
-            SET permissions = ${permissions}
+            SET permissions = ${permissions as any}
             WHERE id = ${id}
             RETURNING *;
         `;

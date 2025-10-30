@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .filter(a => a.type === 'pay-out')
         .reduce((sum, a) => sum + a.amount, 0);
 
-    const expectedInDrawer = session.startingCash + cashSales + totalPayIns - totalPayOuts;
+    const expectedInDrawer = Number(session.startingCash) + cashSales + totalPayIns - totalPayOuts;
     const difference = countedCash - expectedInDrawer;
 
     const result = await sql`

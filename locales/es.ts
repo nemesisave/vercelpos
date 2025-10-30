@@ -10,7 +10,7 @@ export const es = {
     parkedAt: 'Aparcado a las'
   },
   productGrid: {
-    searchPlaceholder: 'Busca o usa el comando de voz...',
+    searchPlaceholder: 'Busca productos...',
     noProductsFound: 'No se encontraron productos',
     noProductsMessage: 'Intenta ajustar tu búsqueda o filtros.',
     clearSearch: 'Limpiar búsqueda',
@@ -149,7 +149,6 @@ export const es = {
       delete: 'Eliminar',
       deactivate: 'Desactivar',
       activate: 'Activar',
-      analyzeActivity: 'Analizar Actividad con IA',
       rolePermissions: 'Permisos de Rol',
       savePermissions: 'Guardar Permisos',
       permissionsUpdated: '¡Permisos actualizados con éxito!',
@@ -398,9 +397,6 @@ export const es = {
     roleName: 'Nombre del Rol',
     permissions: 'Permisos',
     addRole: 'Añadir Rol',
-    suggest: 'Sugerir con IA',
-    enterNameFirst: 'Por favor, ingresa un nombre de rol antes de sugerir permisos.',
-    suggestionError: 'No se pudieron obtener sugerencias de la IA. Por favor, selecciona los permisos manualmente.',
     nameRequired: 'El nombre del rol es obligatorio.'
   },
   editUserModal: {
@@ -555,7 +551,6 @@ export const es = {
     permissionGroup_reports: 'Reportes y Análisis',
     CAN_VIEW_DASHBOARD_REPORTS: 'Ver Dashboard y Reportes',
     CAN_VIEW_SALES_HISTORY: 'Ver Historial de Ventas',
-    CAN_GENERATE_AI_ANALYSIS: 'Generar Análisis con IA',
     permissionGroup_inventory: 'Inventario',
     CAN_VIEW_INVENTORY: 'Ver Lista de Productos',
     CAN_MANAGE_INVENTORY_STOCK_PRICES: 'Editar Stock y Precios',
@@ -599,19 +594,5 @@ export const es = {
     drawerClosedMessage: 'Por favor, abre tu caja para empezar a realizar ventas.',
     drawerClosedAndLoggedOut: 'Caja cerrada. Se ha cerrado tu sesión.',
     featureNotImplemented: 'Esta función aún no está implementada.',
-  },
-  analysisModal: {
-    title: 'Análisis de Ventas e Inventario con IA',
-    generateButton: 'Generar Análisis con IA',
-    analyzing: 'Analizando...',
-    loadingTitle: 'Analizando tus datos...',
-    loadingMessage: 'El asistente de IA está revisando tus ventas e inventario. Esto podría tardar un momento.',
-    close: 'Cerrar',
-    error: 'Ocurrió un error al generar el análisis. Por favor, inténtalo de nuevo.'
-  },
-  userAnalysisModal: {
-    title: 'Análisis de Actividad con IA para {userName}',
-    loadingTitle: 'Analizando Actividad del Usuario...',
-    loadingMessage: 'El asistente de IA está revisando el registro de actividad de {userName} en busca de patrones y anomalías. Esto puede tardar un momento.',
   }
 };

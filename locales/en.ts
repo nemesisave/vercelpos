@@ -10,7 +10,7 @@ export const en = {
     parkedAt: 'Parked at'
   },
   productGrid: {
-    searchPlaceholder: 'Search or use voice command...',
+    searchPlaceholder: 'Search products...',
     noProductsFound: 'No products found',
     noProductsMessage: 'Try adjusting your search or filters.',
     clearSearch: 'Clear search',
@@ -149,7 +149,6 @@ export const en = {
       delete: 'Delete',
       deactivate: 'Deactivate',
       activate: 'Activate',
-      analyzeActivity: 'Analyze Activity with AI',
       rolePermissions: 'Role Permissions',
       savePermissions: 'Save Permissions',
       permissionsUpdated: 'Permissions updated successfully!',
@@ -400,9 +399,6 @@ export const en = {
     roleName: 'Role Name',
     permissions: 'Permissions',
     addRole: 'Add Role',
-    suggest: 'Suggest with AI',
-    enterNameFirst: 'Please enter a role name before suggesting permissions.',
-    suggestionError: 'Could not get AI suggestions. Please select permissions manually.',
     nameRequired: 'Role name is required.'
   },
   editUserModal: {
@@ -557,7 +553,6 @@ export const en = {
     permissionGroup_reports: 'Reports & Analysis',
     CAN_VIEW_DASHBOARD_REPORTS: 'View Dashboard & Reports',
     CAN_VIEW_SALES_HISTORY: 'View Sales History',
-    CAN_GENERATE_AI_ANALYSIS: 'Generate AI Analysis',
     permissionGroup_inventory: 'Inventory',
     CAN_VIEW_INVENTORY: 'View Product List',
     CAN_MANAGE_INVENTORY_STOCK_PRICES: 'Edit Stock & Prices',
@@ -601,19 +596,5 @@ export const en = {
     drawerClosedMessage: 'Please open your cash drawer to begin making sales.',
     drawerClosedAndLoggedOut: 'Cash drawer closed. You have been logged out.',
     featureNotImplemented: 'This feature is not yet implemented.',
-  },
-  analysisModal: {
-    title: 'AI Sales & Inventory Analysis',
-    generateButton: 'Generate AI Analysis',
-    analyzing: 'Analyzing...',
-    loadingTitle: 'Analyzing your data...',
-    loadingMessage: 'The AI assistant is reviewing your sales and inventory. This might take a moment.',
-    close: 'Close',
-    error: 'An error occurred while generating the analysis. Please try again.'
-  },
-  userAnalysisModal: {
-    title: 'AI Activity Analysis for {userName}',
-    loadingTitle: 'Analyzing User Activity...',
-    loadingMessage: 'The AI assistant is reviewing {userName}\'s activity log for patterns and anomalies. This may take a moment.',
   }
 };

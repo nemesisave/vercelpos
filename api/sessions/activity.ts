@@ -16,11 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const sessionResult = await sql`SELECT * FROM session_history WHERE id = ${sessionId}`;
-    if (sessionResult.rows.length === 0 || !(sessionResult.rows[0] as CashDrawerSession).isOpen) {
+    if (sessionResult.rows.length === 0 || !(sessionResult.rows[0] as any).isOpen) {
       return res.status(400).json({ error: 'Session not found or is closed' });
     }
 
-    const currentActivities = (sessionResult.rows[0] as CashDrawerSession).activities || [];
+    const currentActivities = (sessionResult.rows[0] as any).activities || [];
     const newActivities = [...currentActivities, activity];
 
     const result = await sql`
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await sql`
       INSERT INTO audit_logs ("userId", "userName", action, details)
-      VALUES (${userId}, ${userName}, 'CASH_DRAWER_ACTIVITY', ${`Activity: ${activity.type}, Amount: ${activity.amount}, Notes: ${activity.notes || 'N/A'}`});
+      VALUES (${userId}, ${userName}, 'CASH_DRAWER_ACTIVITY', ${`Activity: ${activity.type}, Amount: ${activity.amount}, Notes: ${activity.notes || activity.orderId || 'N/A'}`});
     `;
 
     res.status(200).json(updatedSession);

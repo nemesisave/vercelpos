@@ -4,7 +4,6 @@ export const ALL_PERMISSIONS: Permission[] = [
     'CAN_PROCESS_PAYMENTS',
     'CAN_VIEW_DASHBOARD_REPORTS',
     'CAN_VIEW_SALES_HISTORY',
-    'CAN_GENERATE_AI_ANALYSIS',
     'CAN_VIEW_INVENTORY',
     'CAN_MANAGE_INVENTORY_STOCK_PRICES',
     'CAN_ADD_PRODUCTS',
@@ -25,7 +24,7 @@ export const PERMISSION_GROUPS: { [key: string]: { labelKey: string; permissions
     },
     reports: {
         labelKey: 'permissions.permissionGroup_reports',
-        permissions: ['CAN_VIEW_DASHBOARD_REPORTS', 'CAN_VIEW_SALES_HISTORY', 'CAN_GENERATE_AI_ANALYSIS']
+        permissions: ['CAN_VIEW_DASHBOARD_REPORTS', 'CAN_VIEW_SALES_HISTORY']
     },
     inventory: {
         labelKey: 'permissions.permissionGroup_inventory',

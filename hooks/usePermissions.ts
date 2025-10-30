@@ -24,7 +24,6 @@ export const usePermissions = (user: User | null, roles: Role[]) => {
         CAN_PROCESS_PAYMENTS: false,
         CAN_VIEW_DASHBOARD_REPORTS: false,
         CAN_VIEW_SALES_HISTORY: false,
-        CAN_GENERATE_AI_ANALYSIS: false,
         CAN_VIEW_INVENTORY: false,
         CAN_MANAGE_INVENTORY_STOCK_PRICES: false,
         CAN_ADD_PRODUCTS: false,

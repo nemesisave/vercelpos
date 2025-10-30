@@ -6,8 +6,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     try {
       const { name, phone, email, address, notes } = req.body as NewCustomerPayload;
-      if (!name) {
-        return res.status(400).json({ error: 'Customer name is required' });
+      if (!name || !phone || !email) {
+        return res.status(400).json({ error: 'Name, phone and email are required' });
       }
 
       const result = await sql`

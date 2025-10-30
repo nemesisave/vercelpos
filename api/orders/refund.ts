@@ -1,16 +1,17 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { withTx } from '../_db.js';
-import { CompletedOrder, OrderItem, RefundTransaction } from '../../types.js';
+import { CompletedOrder, OrderItem, RefundTransaction, User } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }
 
-  const { originalInvoiceId, itemsToRefund, restock } = req.body as {
+  const { originalInvoiceId, itemsToRefund, restock, userId } = req.body as {
     originalInvoiceId: string;
     itemsToRefund: { id: number; quantity: number }[];
     restock: boolean;
+    userId: number;
   };
 
   try {
@@ -22,21 +23,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const order: CompletedOrder = orderResult.rows[0] as any;
 
+      const userResult = await tx`SELECT name FROM users WHERE id = ${userId}`;
+      if (userResult.rows.length === 0) {
+        throw new Error('User not found');
+      }
+      const user = userResult.rows[0] as User;
+
       // 2. Calculate refund amount and create refund items
       let totalRefundAmount = 0;
       const refundItems: OrderItem[] = [];
+      const baseCurrency = Object.keys(order.items[0].price)[0]; // Infer base currency from first item
+
       for (const item of itemsToRefund) {
         const orderItem = order.items.find(i => i.id === item.id);
         if (!orderItem) throw new Error(`Item ID ${item.id} not found in original order.`);
         
-        const price = orderItem.price[order.items[0].price ? Object.keys(order.items[0].price)[0] : 'USD'] || 0;
+        const price = orderItem.price[baseCurrency] || 0;
         totalRefundAmount += price * item.quantity;
         refundItems.push({ ...orderItem, quantity: item.quantity });
       }
 
-      // Adjust for tax
-      const taxRate = order.subtotal > 0 ? order.tax / (order.subtotal - (order.discount || 0)) : 0;
-      totalRefundAmount = totalRefundAmount * (1 + taxRate);
+      // Adjust for tax and discount proportionally
+      const refundProportion = totalRefundAmount / order.subtotal;
+      const taxRefund = order.tax * refundProportion;
+      totalRefundAmount = totalRefundAmount + taxRefund;
       
       // 3. Update stock if required
       let updatedProducts: { id: number; stock: number }[] | undefined = undefined;
@@ -51,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 4. Update order status and refund amount
-      const newRefundAmount = (order.refundAmount || 0) + totalRefundAmount;
+      const newRefundAmount = (Number(order.refundAmount) || 0) + totalRefundAmount;
       const isFullyRefunded = Math.abs(newRefundAmount - order.total) < 0.01;
       const newStatus = isFullyRefunded ? 'Fully Refunded' : 'Partially Refunded';
       
@@ -68,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const newRefund: Omit<RefundTransaction, 'id'> = {
         originalInvoiceId,
         date: new Date().toLocaleString(),
-        cashier: order.cashier, // Assuming same cashier, could be passed from frontend
+        cashier: user.name,
         items: refundItems,
         totalRefundAmount,
         stockRestored: restock

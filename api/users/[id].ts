@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql, withTx } from '../_db.js';
+import { withTx } from '../_db.js';
 import { UserUpdatePayload } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -16,31 +16,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const updatedUser = await withTx(async (tx) => {
         const beforeResult = await tx`SELECT * FROM users WHERE id = ${id}`;
         if (beforeResult.rows.length === 0) {
-            // This will cause a rollback
             throw new Error('User not found');
         }
         const currentUser = beforeResult.rows[0];
+        
+        const { password, ...safeCurrentUser } = currentUser;
 
-        // Merge updates with current data
-        const newUserState = { ...currentUser, ...updates };
+        const setClauses = [];
+        const values = [];
+        let valueCount = 1;
 
-        // Handle date formatting for lastLogin
-        const lastLogin = newUserState.lastLogin ? new Date(newUserState.lastLogin).toISOString() : null;
+        for (const [key, value] of Object.entries(updates)) {
+            if (value !== undefined) {
+                const dbKey = key === 'roleId' ? '"roleId"' : key === 'lastLogin' ? '"lastLogin"' : key;
+                if (dbKey === 'password' && !value) continue; // Don't update password if it's an empty string
+                
+                setClauses.push(`${dbKey} = $${valueCount++}`);
+                values.push(value);
+            }
+        }
 
-        const result = await tx`
-            UPDATE users SET
-                name = ${newUserState.name},
-                username = ${newUserState.username},
-                password = ${updates.password || currentUser.password},
-                pin = ${newUserState.pin},
-                "roleId" = ${newUserState.roleId},
-                status = ${newUserState.status},
-                "lastLogin" = ${lastLogin}
-            WHERE id = ${id}
-            RETURNING *;
-        `;
-        const updatedUser = result.rows[0];
+        if (setClauses.length === 0) {
+            return safeCurrentUser;
+        }
 
+        values.push(id);
+        const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${valueCount} RETURNING *;`;
+
+        const result = await tx.query(query, values);
+        
+        const { password: _, ...updatedUser } = result.rows[0];
+        
         await tx`
           INSERT INTO audit_logs ("userId", "userName", action, details)
           VALUES (${id}, ${updatedUser.name}, 'UPDATE_USER', ${`Updated user details for ${updatedUser.name}`});
@@ -49,10 +55,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return updatedUser;
       });
       
-      if (!updatedUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
       res.status(200).json(updatedUser);
 
     } catch (error) {
