@@ -122,7 +122,7 @@ const App: React.FC = () => {
         setBusinessSettings(updatedSettings);
         addAuditLog('UPDATE_SETTINGS', 'Business settings updated.');
     } catch (error) {
-        alert('Failed to update business settings.');
+        alert(`Failed to update business settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -132,7 +132,7 @@ const App: React.FC = () => {
         setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
         addAuditLog('UPDATE_PRODUCT', `Updated product: ${updatedProduct.name}`);
     } catch (error) {
-        alert('Failed to update product.');
+        alert(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [addAuditLog]);
   
@@ -143,7 +143,7 @@ const App: React.FC = () => {
         setProducts(prev => prev.filter(p => p.id !== productId));
         addAuditLog('DELETE_PRODUCT', `Deleted product: ${deletedProductName}`);
     } catch (error) {
-        alert('Failed to delete product.');
+        alert(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [addAuditLog, products]);
 
@@ -153,7 +153,7 @@ const App: React.FC = () => {
         setProducts(prev => [newProduct, ...prev]);
         addAuditLog('ADD_PRODUCT', `Added new product: ${newProduct.name}`);
     } catch (error) {
-        alert('Failed to add new product.');
+        alert(`Failed to add new product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [addAuditLog]);
 
@@ -163,7 +163,7 @@ const App: React.FC = () => {
         setUsers(prev => [...prev, newUser]);
         addAuditLog('ADD_USER', `Added new user: ${newUser.name}`);
     } catch (error) {
-        alert('Failed to add new user.');
+        alert(`Failed to add new user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -176,7 +176,7 @@ const App: React.FC = () => {
         }
         addAuditLog('UPDATE_USER', `Updated user: ${updatedUser.name}`);
     } catch (error) {
-        alert('Failed to update user.');
+        alert(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -223,7 +223,7 @@ const App: React.FC = () => {
         setRoles(prev => [...prev, newRole]);
         addAuditLog('ADD_ROLE', `Added new role: ${newRole.name}`);
     } catch (error) {
-        alert('Failed to add role.');
+        alert(`Failed to add role: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -233,7 +233,7 @@ const App: React.FC = () => {
         setRoles(prev => prev.map(r => r.id === roleId ? updatedRole : r));
         addAuditLog('UPDATE_ROLE_PERMISSIONS', `Updated permissions for role: ${updatedRole.name}`);
     } catch (error) {
-        alert('Failed to update role permissions.');
+        alert(`Failed to update role permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -243,7 +243,7 @@ const App: React.FC = () => {
         setSuppliers(prev => [...prev, newSupplier]);
         addAuditLog('ADD_SUPPLIER', `Added new supplier: ${newSupplier.name}`);
     } catch (error) {
-        alert('Failed to add supplier.');
+        alert(`Failed to add supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -253,7 +253,7 @@ const App: React.FC = () => {
         setSuppliers(prev => prev.map(s => s.id === supplierId ? updatedSupplier : s));
         addAuditLog('UPDATE_SUPPLIER', `Updated supplier: ${updatedSupplier.name}`);
     } catch (error) {
-         alert('Failed to update supplier.');
+         alert(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -276,7 +276,7 @@ const App: React.FC = () => {
         setPurchaseOrders(prev => [newPO, ...prev]);
         addAuditLog('CREATE_PO', `Created Purchase Order ${newPO.id} for ${newPO.supplierName}`);
     } catch (error) {
-         alert('Failed to create purchase order.');
+         alert(`Failed to create purchase order: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -294,7 +294,7 @@ const App: React.FC = () => {
         });
         addAuditLog('RECEIVE_STOCK', `Received stock for PO ${purchaseOrderId}`);
     } catch (error) {
-        alert('Failed to receive stock.');
+        alert(`Failed to receive stock: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -315,7 +315,7 @@ const App: React.FC = () => {
             });
         }
     } catch (error) {
-        alert('Failed to process refund.');
+        alert(`Failed to process refund: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -325,7 +325,7 @@ const App: React.FC = () => {
         setCurrencies(updatedCurrencies);
     } catch (error) {
         console.error("Failed to save currency settings:", error);
-        alert('Failed to save currency settings.');
+        alert(`Failed to save currency settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -336,7 +336,7 @@ const App: React.FC = () => {
         setBusinessSettings(newSettings);
     } catch (error) {
         console.error("Failed to fetch latest currency rates:", error);
-        alert('Failed to fetch latest currency rates.');
+        alert(`Failed to fetch latest currency rates: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -444,7 +444,7 @@ const App: React.FC = () => {
             setParkedOrders(prev => [...prev, newParkedOrder]);
             clearOrder();
         } catch (error) {
-            alert('Failed to park sale.');
+            alert(`Failed to park sale: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
   };
@@ -462,7 +462,7 @@ const App: React.FC = () => {
             setOrderItems(orderToUnpark.items);
             setParkedOrders(prev => prev.filter(p => p.id !== parkedOrderId));
         } catch (error) {
-            alert('Failed to unpark sale.');
+            alert(`Failed to unpark sale: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
   };
@@ -519,7 +519,7 @@ const App: React.FC = () => {
         setCurrentSession(newSession);
         setDrawerModalOpen(false);
     } catch(e) {
-        alert('Failed to open cash drawer session.');
+        alert(`Failed to open cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
 
@@ -537,7 +537,7 @@ const App: React.FC = () => {
         alert(t('app.drawerClosedAndLoggedOut'));
         setCurrentUser(null);
     } catch(e) {
-        alert('Failed to close cash drawer session.');
+        alert(`Failed to close cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
 
@@ -553,7 +553,7 @@ const App: React.FC = () => {
         // Update history in case it's displayed
         setSessionHistory(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
     } catch(e) {
-        alert(`Failed to record activity: ${activity.type}`);
+        alert(`Failed to record activity: ${activity.type}. Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   };
   

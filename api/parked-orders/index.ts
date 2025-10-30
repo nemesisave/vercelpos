@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '../_db.js';
+import { sql, ensureDbInitialized } from '../_db.js';
 import { ParkedOrder, OrderItem } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  await ensureDbInitialized();
   if (req.method === 'POST') {
     try {
       const { name, items } = req.body as { name: string, items: OrderItem[] };

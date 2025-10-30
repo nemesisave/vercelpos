@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '../_db.js';
+import { sql, ensureDbInitialized } from '../_db.js';
 import { PurchaseOrderItem } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  await ensureDbInitialized();
   if (req.method === 'POST') {
     try {
       const { supplierId, supplierName, items, totalCost } = req.body as {

@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withTx } from '../_db.js';
+import { withTx, ensureDbInitialized } from '../_db.js';
 import { CompletedOrder, OrderItem, RefundTransaction, User } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  await ensureDbInitialized();
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }

@@ -1,11 +1,12 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '../_db.js';
+import { sql, ensureDbInitialized } from '../_db.js';
 import { NewProductPayload } from '../../types.js';
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
 ) {
+  await ensureDbInitialized();
   if (req.method === 'POST') {
     try {
       const { name, price, purchasePrice, imageUrl, category, stock, sellBy } = req.body as NewProductPayload;
