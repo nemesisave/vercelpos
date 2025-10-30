@@ -376,10 +376,7 @@ const App: React.FC = () => {
     }
   }, [products, orderItems, t, currentSession]);
 
-  const handleVoiceCommand = useCallback(async (command: string) => {
-    // Voice command functionality removed
-  }, []);
-  
+  // FIX: Removed unused handleVoiceCommand
    const handleWeightEntered = (product: Product, weight: number) => {
     if (weight <= 0) {
       setProductToWeigh(null);
@@ -662,7 +659,6 @@ const App: React.FC = () => {
             isDrawerModalOpen={isDrawerModalOpen}
             isPinModalOpen={isPinModalOpen}
             pinEntryUser={pinEntryUser}
-            aiUpsellSuggestion={null}
             discount={discount}
             tip={tip}
             selectedCustomerForOrder={selectedCustomerForOrder}
@@ -712,7 +708,6 @@ const App: React.FC = () => {
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
             onUnparkSale={handleUnparkSale}
-            onVoiceCommand={handleVoiceCommand}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}

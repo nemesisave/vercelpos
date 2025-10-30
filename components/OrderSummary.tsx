@@ -18,8 +18,6 @@ interface OrderSummaryProps {
   onClearOrder: () => void;
   onCheckout: () => void;
   onParkSale: () => void;
-  aiUpsellSuggestion: string | null;
-  onAddSuggested: (productName: string) => void;
   discount: number;
   tip: number;
   onApplyDiscount: (amount: number) => void;
@@ -75,7 +73,7 @@ const OrderItemRow: React.FC<{
 
 const OrderSummary: React.FC<OrderSummaryProps> = ({
   items, user, roles, taxRate, isLocked, selectedCustomer, onAddCustomerClick, onRemoveCustomerClick, onUpdateQuantity, onRemoveItem, onClearOrder, onCheckout, onParkSale,
-  aiUpsellSuggestion, onAddSuggested, discount, tip, onApplyDiscount, isMobileView = false, onClose
+  discount, tip, onApplyDiscount, isMobileView = false, onClose
 }) => {
   const permissions = usePermissions(user, roles);
   const { t } = useTranslations();
@@ -142,12 +140,6 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       ) : (
         <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-background/50 divide-y divide-border">
           {items.map(item => <OrderItemRow key={item.id} item={item} onUpdateQuantity={onUpdateQuantity} onRemoveItem={onRemoveItem} />)}
-          {aiUpsellSuggestion && (
-            <div className="p-3 text-center bg-indigo-50 border border-indigo-200 rounded-lg">
-                <p className="text-sm text-indigo-700">{t('orderSummary.suggestion')}</p>
-                <button onClick={() => onAddSuggested(aiUpsellSuggestion)} className="mt-1 font-bold text-indigo-600 hover:underline">{aiUpsellSuggestion}</button>
-            </div>
-          )}
         </div>
       )}
       <div className="p-6 mt-auto bg-surface border-t-2 border-border">

@@ -165,6 +165,7 @@ export const en = {
       confirmDeactivateMessage: 'Are you sure you want to deactivate',
       confirmActivateTitle: 'Activate User',
       confirmActivateMessage: 'Are you sure you want to activate',
+      analyzeActivity: 'Analyze User Activity with AI',
     },
      customers: {
       title: 'Customer Management',
@@ -399,7 +400,10 @@ export const en = {
     roleName: 'Role Name',
     permissions: 'Permissions',
     addRole: 'Add Role',
-    nameRequired: 'Role name is required.'
+    nameRequired: 'Role name is required.',
+    suggest: 'Suggest',
+    enterNameFirst: 'Please enter a role name before suggesting permissions.',
+    suggestionError: 'Could not get suggestions. Please set permissions manually.'
   },
   editUserModal: {
     title: 'Edit User',
@@ -541,6 +545,21 @@ export const en = {
   selectCustomerModal: {
     title: 'Select a Customer',
   },
+  analysisModal: {
+    title: 'Business Performance Analysis',
+    generateButton: 'Generate AI Analysis',
+    analyzing: 'Analyzing...',
+    loadingTitle: 'Generating Analysis...',
+    loadingMessage: 'Please wait while Gemini analyzes your sales and inventory data.',
+    close: 'Close',
+    error: 'An error occurred while generating the analysis. Please check your connection or API key and try again.'
+  },
+  userAnalysisModal: {
+    title: 'User Activity Analysis for {userName}',
+    loadingTitle: 'Analyzing Activity...',
+    loadingMessage: 'Please wait while Gemini analyzes the activity logs for {userName}.',
+    error: 'An error occurred while analyzing user activity. Please try again later.',
+  },
   roles: {
     admin: 'Admin',
     cashier: 'Cashier',
@@ -566,6 +585,7 @@ export const en = {
     CAN_MANAGE_CUSTOMERS: 'Manage Customers',
     CAN_MANAGE_CASH_DRAWER: 'Manage Cash Drawer Sessions',
     CAN_MANAGE_BUSINESS_SETTINGS: 'Manage Business Settings',
+    CAN_GENERATE_AI_ANALYSIS: 'Generate AI Analysis',
   },
   auditLog: {
     title: 'Audit Log',

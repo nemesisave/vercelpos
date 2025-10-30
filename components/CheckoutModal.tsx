@@ -100,7 +100,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, orderIte
             </div>
           </div>
            <div className="text-center mb-6">
-                <button onClick={() => alert(t('app.featureNotImplemented'))} className="text-sm text-blue-600 hover:underline">{t('checkoutModal.splitBill')}</button>
+                <button disabled title={t('app.featureNotImplemented')} className="text-sm text-blue-600/50 cursor-not-allowed">{t('checkoutModal.splitBill')}</button>
            </div>
 
           <button

@@ -56,7 +56,9 @@ export type Permission =
   | 'CAN_MANAGE_USERS_AND_ROLES'
   | 'CAN_MANAGE_CUSTOMERS'
   | 'CAN_MANAGE_CASH_DRAWER'
-  | 'CAN_MANAGE_BUSINESS_SETTINGS';
+  | 'CAN_MANAGE_BUSINESS_SETTINGS'
+  // FIX: Add CAN_GENERATE_AI_ANALYSIS permission for AI features
+  | 'CAN_GENERATE_AI_ANALYSIS';
 
 export interface Role {
   id: string;

@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 `;
 
 const MOCK_ROLES = [
+    // FIX: Add CAN_GENERATE_AI_ANALYSIS permission to admin role
     { id: 'admin', name: 'Admin', descriptionKey: 'roles.adminDescription', permissions: ['CAN_PROCESS_PAYMENTS', 'CAN_VIEW_DASHBOARD_REPORTS', 'CAN_VIEW_SALES_HISTORY', 'CAN_GENERATE_AI_ANALYSIS', 'CAN_VIEW_INVENTORY', 'CAN_MANAGE_INVENTORY_STOCK_PRICES', 'CAN_ADD_PRODUCTS', 'CAN_EDIT_DELETE_PRODUCTS', 'CAN_PERFORM_STOCK_COUNT', 'CAN_MANAGE_SUPPLIERS_AND_POs', 'CAN_MANAGE_USERS_AND_ROLES', 'CAN_MANAGE_CUSTOMERS', 'CAN_MANAGE_CASH_DRAWER', 'CAN_MANAGE_BUSINESS_SETTINGS'] },
     { id: 'cashier', name: 'Cashier', descriptionKey: 'roles.cashierDescription', permissions: ['CAN_PROCESS_PAYMENTS','CAN_VIEW_INVENTORY','CAN_MANAGE_CASH_DRAWER'] }
 ];
@@ -234,7 +235,7 @@ export async function seedInitialData() {
     }
     
     for (const role of MOCK_ROLES) {
-        await sql`INSERT INTO roles (id, name, "descriptionKey", permissions) VALUES (${role.id}, ${role.name}, ${role.descriptionKey}, ${role.permissions}) ON CONFLICT (id) DO NOTHING;`;
+        await sql`INSERT INTO roles (id, name, "descriptionKey", permissions) VALUES (${role.id}, ${role.name}, ${role.descriptionKey}, ${role.permissions as any}) ON CONFLICT (id) DO NOTHING;`;
     }
 
     for (const user of MOCK_USERS) {

@@ -41,7 +41,6 @@ interface AppContentProps {
     isDrawerModalOpen: boolean;
     isPinModalOpen: boolean;
     pinEntryUser: User | null;
-    aiUpsellSuggestion: string | null;
     discount: number;
     tip: number;
     selectedCustomerForOrder: Customer | null;
@@ -91,7 +90,6 @@ interface AppContentProps {
     onFetchLatestRates: () => Promise<void>;
     onParkSale: () => void;
     onUnparkSale: (id: string) => void;
-    onVoiceCommand: (command: string) => void;
     onAddCustomer: (data: NewCustomerPayload) => Promise<Customer>;
     onUpdateCustomer: (id: number, data: CustomerUpdatePayload) => void;
     onDeleteCustomer: (id: number) => void;
@@ -110,7 +108,7 @@ const AppContent: React.FC<AppContentProps> = ({
     onAddProduct, onAddUser, onUpdateUser, onUpdateUserStatus, onAddRole, onUpdateRolePermissions,
     onUpdateBusinessSettings, onViewReceipt, onCloseDrawer, onPayIn, onPayOut,
     onAddSupplier, onUpdateSupplier, onDeleteSupplier, onCreatePurchaseOrder, onReceiveStock,
-    onProcessRefund, onSetCurrencies, onFetchLatestRates, onParkSale, onUnparkSale, onVoiceCommand, aiUpsellSuggestion,
+    onProcessRefund, onSetCurrencies, onFetchLatestRates, onParkSale, onUnparkSale,
     onAddCustomer, onUpdateCustomer, onDeleteCustomer, discount, tip, setDiscount, setTip,
     selectedCustomerForOrder, isSelectCustomerModalOpen, setSelectCustomerModalOpen, onSetCustomerForOrder
 }) => {
@@ -185,7 +183,7 @@ const AppContent: React.FC<AppContentProps> = ({
                 </div>
             )}
             <div className="col-span-1 md:col-span-2 lg:col-span-3 h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <ProductGrid products={products} onAddToOrder={addToOrder} isLocked={isLocked} onVoiceCommand={onVoiceCommand} />
+                <ProductGrid products={products} onAddToOrder={addToOrder} isLocked={isLocked} />
             </div>
             
             <div className="col-span-1 h-full flex-col hidden md:flex">
@@ -203,11 +201,6 @@ const AppContent: React.FC<AppContentProps> = ({
                   onClearOrder={clearOrder}
                   onCheckout={() => setCheckoutModalOpen(true)}
                   onParkSale={onParkSale}
-                  aiUpsellSuggestion={aiUpsellSuggestion}
-                  onAddSuggested={(name) => {
-                    const product = products.find(p => p.name === name);
-                    if (product) addToOrder(product);
-                  }}
                   discount={discount}
                   tip={tip}
                   onApplyDiscount={setDiscount}
@@ -256,11 +249,6 @@ const AppContent: React.FC<AppContentProps> = ({
                       setCheckoutModalOpen(true);
                   }}
                   onParkSale={onParkSale}
-                  aiUpsellSuggestion={aiUpsellSuggestion}
-                  onAddSuggested={(name) => {
-                    const product = products.find(p => p.name === name);
-                    if (product) addToOrder(product);
-                  }}
                   discount={discount}
                   tip={tip}
                   onApplyDiscount={setDiscount}

@@ -15,6 +15,8 @@ const ADMIN_PANEL_PERMISSIONS: Permission[] = [
     'CAN_MANAGE_CUSTOMERS',
     'CAN_MANAGE_CASH_DRAWER',
     'CAN_MANAGE_BUSINESS_SETTINGS',
+    // FIX: Add CAN_GENERATE_AI_ANALYSIS permission for AI features
+    'CAN_GENERATE_AI_ANALYSIS',
 ];
 
 export const usePermissions = (user: User | null, roles: Role[]) => {
@@ -34,6 +36,8 @@ export const usePermissions = (user: User | null, roles: Role[]) => {
         CAN_MANAGE_CUSTOMERS: false,
         CAN_MANAGE_CASH_DRAWER: false,
         CAN_MANAGE_BUSINESS_SETTINGS: false,
+        // FIX: Add CAN_GENERATE_AI_ANALYSIS permission for AI features
+        CAN_GENERATE_AI_ANALYSIS: false,
         canAccessAdminPanel: false,
     };
 

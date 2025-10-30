@@ -165,6 +165,7 @@ export const es = {
       confirmDeactivateMessage: '¿Estás seguro de que quieres desactivar a',
       confirmActivateTitle: 'Activar Usuario',
       confirmActivateMessage: '¿Estás seguro de que quieres activar a',
+      analyzeActivity: 'Analizar Actividad de Usuario con IA',
     },
      customers: {
       title: 'Gestión de Clientes',
@@ -397,7 +398,10 @@ export const es = {
     roleName: 'Nombre del Rol',
     permissions: 'Permisos',
     addRole: 'Añadir Rol',
-    nameRequired: 'El nombre del rol es obligatorio.'
+    nameRequired: 'El nombre del rol es obligatorio.',
+    suggest: 'Sugerir',
+    enterNameFirst: 'Por favor, introduce un nombre para el rol antes de sugerir permisos.',
+    suggestionError: 'No se pudieron obtener sugerencias. Por favor, asigna los permisos manualmente.'
   },
   editUserModal: {
     title: 'Editar Usuario',
@@ -539,6 +543,21 @@ export const es = {
   selectCustomerModal: {
     title: 'Seleccionar un Cliente',
   },
+  analysisModal: {
+    title: 'Análisis de Rendimiento del Negocio',
+    generateButton: 'Generar Análisis IA',
+    analyzing: 'Analizando...',
+    loadingTitle: 'Generando Análisis...',
+    loadingMessage: 'Por favor, espera mientras Gemini analiza tus datos de ventas e inventario.',
+    close: 'Cerrar',
+    error: 'Ocurrió un error al generar el análisis. Por favor, revisa tu conexión o clave de API e inténtalo de nuevo.'
+  },
+  userAnalysisModal: {
+    title: 'Análisis de Actividad para {userName}',
+    loadingTitle: 'Analizando Actividad...',
+    loadingMessage: 'Por favor espera mientras Gemini analiza los registros de auditoría para {userName}.',
+    error: 'Ocurrió un error al analizar la actividad del usuario. Por favor, inténtalo de nuevo más tarde.',
+  },
   roles: {
     admin: 'Administrador',
     cashier: 'Cajero',
@@ -564,6 +583,7 @@ export const es = {
     CAN_MANAGE_CUSTOMERS: 'Gestionar Clientes',
     CAN_MANAGE_CASH_DRAWER: 'Gestionar Sesiones de Caja',
     CAN_MANAGE_BUSINESS_SETTINGS: 'Gestionar Ajustes del Negocio',
+    CAN_GENERATE_AI_ANALYSIS: 'Generar Análisis con IA',
   },
   auditLog: {
     title: 'Registro de Auditoría',
