@@ -1,4 +1,5 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
+import { db, sql as vercelSql, NeonQueryFunction } from '@vercel/postgres';
 import {
   InitialData
 } from '../types.js';
@@ -7,7 +8,28 @@ import { CURRENCIES as MOCK_CURRENCIES } from '../currencies.js';
 if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is not set");
 }
-export const sql = neon(process.env.DATABASE_URL);
+
+// Use the vercelSql export for general queries, as it handles connection pooling.
+export const sql = vercelSql;
+
+/**
+ * Executes a transaction block.
+ * @param callback A function that receives a transactional client and executes queries.
+ */
+export async function withTx<T>(callback: (sql: NeonQueryFunction) => Promise<T>): Promise<T> {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await callback(client.sql);
+        await client.query('COMMIT');
+        return result;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+}
 
 
 export const schemaSql = `
@@ -89,7 +111,7 @@ CREATE TABLE IF NOT EXISTS customers (
     email TEXT,
     address TEXT,
     notes TEXT,
-    "createdAt" TIMESTAMPTZ
+    "createdAt" TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -142,25 +164,18 @@ CREATE TABLE IF NOT EXISTS session_history (
     "closedAt" TEXT
 );
 
--- Main audit log table as requested
-CREATE TABLE IF NOT EXISTS audit_log (
-    id SERIAL PRIMARY KEY,
-    ts TIMESTAMPTZ DEFAULT NOW(),
-    actor_id INT,
-    action TEXT NOT NULL,
-    entity TEXT NOT NULL,
-    entity_id TEXT,
-    before_state JSONB,
-    after_state JSONB,
-    metadata JSONB
+CREATE TABLE IF NOT EXISTS parked_orders (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    items JSONB,
+    "parkedAt" TEXT
 );
 
--- Old audit_logs table for compatibility if needed, can be removed later
 CREATE TABLE IF NOT EXISTS audit_logs (
     id SERIAL PRIMARY KEY,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    user_id INT,
-    user_name TEXT,
+    "timestamp" TIMESTAMPTZ DEFAULT NOW(),
+    "userId" INT,
+    "userName" TEXT,
     action TEXT,
     details TEXT
 );
@@ -207,8 +222,8 @@ const MOCK_BUSINESS_SETTINGS = {
 
 export async function seedInitialData() {
     await sql`
-        INSERT INTO business_settings ("businessName", "taxRate", phone, address, "taxId", currency, "logoUrl", "receiptHeaderText", "receiptFooterText", "receiptShowAddress", "receiptShowPhone", "receiptShowTaxId", "currencyRatesLastUpdated")
-        VALUES (${MOCK_BUSINESS_SETTINGS.businessName}, ${MOCK_BUSINESS_SETTINGS.taxRate}, ${MOCK_BUSINESS_SETTINGS.phone}, ${MOCK_BUSINESS_SETTINGS.address}, ${MOCK_BUSINESS_SETTINGS.taxId}, ${MOCK_BUSINESS_SETTINGS.currency}, ${MOCK_BUSINESS_SETTINGS.logoUrl}, ${MOCK_BUSINESS_SETTINGS.receiptHeaderText}, ${MOCK_BUSINESS_SETTINGS.receiptFooterText}, ${MOCK_BUSINESS_SETTINGS.receiptShowAddress}, ${MOCK_BUSINESS_SETTINGS.receiptShowPhone}, ${MOCK_BUSINESS_SETTINGS.receiptShowTaxId}, ${MOCK_BUSINESS_SETTINGS.currencyRatesLastUpdated})
+        INSERT INTO business_settings (id, "businessName", "taxRate", phone, address, "taxId", currency, "logoUrl", "receiptHeaderText", "receiptFooterText", "receiptShowAddress", "receiptShowPhone", "receiptShowTaxId", "currencyRatesLastUpdated")
+        VALUES (1, ${MOCK_BUSINESS_SETTINGS.businessName}, ${MOCK_BUSINESS_SETTINGS.taxRate}, ${MOCK_BUSINESS_SETTINGS.phone}, ${MOCK_BUSINESS_SETTINGS.address}, ${MOCK_BUSINESS_SETTINGS.taxId}, ${MOCK_BUSINESS_SETTINGS.currency}, ${MOCK_BUSINESS_SETTINGS.logoUrl}, ${MOCK_BUSINESS_SETTINGS.receiptHeaderText}, ${MOCK_BUSINESS_SETTINGS.receiptFooterText}, ${MOCK_BUSINESS_SETTINGS.receiptShowAddress}, ${MOCK_BUSINESS_SETTINGS.receiptShowPhone}, ${MOCK_BUSINESS_SETTINGS.receiptShowTaxId}, ${MOCK_BUSINESS_SETTINGS.currencyRatesLastUpdated})
         ON CONFLICT (id) DO NOTHING;
     `;
     
@@ -223,11 +238,11 @@ export async function seedInitialData() {
     }
 
     for (const user of MOCK_USERS) {
-        await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status, "lastLogin") VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status}, ${user.lastLogin}) ON CONFLICT (username) DO NOTHING;`;
+        await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status}) ON CONFLICT (username) DO NOTHING;`;
     }
 
     for (const product of MOCK_PRODUCTS) {
-        await sql`INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy") VALUES (${product.name}, ${JSON.stringify(product.price)}, ${JSON.stringify(product.purchasePrice)}, ${product.imageUrl}, ${product.category}, ${product.stock}, ${product.sellBy}) ON CONFLICT (id) DO NOTHING;`;
+        await sql`INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy") VALUES (${product.name}, ${JSON.stringify(product.price)}, ${JSON.stringify(product.purchasePrice)}, ${product.imageUrl}, ${product.category}, ${product.stock}, ${product.sellBy}) ON CONFLICT (name) DO NOTHING;`;
     }
 
     for (const supplier of MOCK_SUPPLIERS) {

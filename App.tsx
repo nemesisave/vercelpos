@@ -7,7 +7,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import { CurrencyProvider } from './context/CurrencyContext';
 import AppContent from './components/AppContent';
 import * as api from './services/apiService';
-import { getUpsellSuggestion, parseVoiceCommand } from './services/geminiService';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 
@@ -41,7 +40,6 @@ const App: React.FC = () => {
   const [productToWeigh, setProductToWeigh] = useState<Product | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinEntryUser, setPinEntryUser] = useState<User | null>(null);
-  const [aiUpsellSuggestion, setAiUpsellSuggestion] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
   const [tip, setTip] = useState(0);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState<Customer | null>(null);
@@ -68,12 +66,20 @@ const App: React.FC = () => {
           setSessionHistory(data.sessionHistory || []);
           setAuditLogs(data.auditLogs || []);
           setCurrencies(data.currencies || INITIAL_CURRENCIES);
+          setParkedOrders(data.parkedOrders || []);
+
+          const openSession = data.sessionHistory.find(s => s.isOpen);
+          setCurrentSession(openSession || null);
+
           if (data.appSettings) {
             setThemeState(data.appSettings.theme);
             setLanguageState(data.appSettings.language);
           }
       } catch (e) {
           setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
+          if (e instanceof Error && e.message.includes('relation') && e.message.includes('does not exist')) {
+            setError('Database tables not found. Please run initialization.');
+          }
       } finally {
           setIsLoading(false);
       }
@@ -91,24 +97,21 @@ const App: React.FC = () => {
         await api.updateAppSettings({ theme: newTheme });
     } catch (e) {
         console.error("Failed to save theme", e);
-        // Optionally revert state here
     }
   };
 
   const handleSetLanguage = async (newLang: 'en' | 'es') => {
-      setLanguageState(newLang); // Optimistic update
+      setLanguageState(newLang);
       try {
           await api.updateAppSettings({ language: newLang });
       } catch (e) {
           console.error("Failed to save language", e);
-          // Optionally revert state here
       }
   };
 
   const addAuditLog = useCallback(async (action: string, details: string, user: User | null = currentUser) => {
     if (!user) return;
     try {
-        // This now calls the backend. Audit logging is also done automatically for most actions.
         const newLog = await api.addAuditLog(user.id, user.name, action, details);
         setAuditLogs(prev => [newLog, ...prev]);
     } catch (error) {
@@ -120,6 +123,7 @@ const App: React.FC = () => {
     try {
         const updatedSettings = await api.updateBusinessSettings(newSettings);
         setBusinessSettings(updatedSettings);
+        addAuditLog('UPDATE_SETTINGS', 'Business settings updated.');
     } catch (error) {
         alert('Failed to update business settings.');
     }
@@ -129,33 +133,38 @@ const App: React.FC = () => {
     try {
         const updatedProduct = await api.updateProduct(productId, updates);
         setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
+        addAuditLog('UPDATE_PRODUCT', `Updated product: ${updatedProduct.name}`);
     } catch (error) {
         alert('Failed to update product.');
     }
-  }, []);
+  }, [addAuditLog]);
   
   const handleDeleteProduct = useCallback(async (productId: number) => {
     try {
         await api.deleteProduct(productId);
+        const deletedProductName = products.find(p => p.id === productId)?.name || `ID ${productId}`;
         setProducts(prev => prev.filter(p => p.id !== productId));
+        addAuditLog('DELETE_PRODUCT', `Deleted product: ${deletedProductName}`);
     } catch (error) {
         alert('Failed to delete product.');
     }
-  }, []);
+  }, [addAuditLog, products]);
 
   const handleAddNewProduct = useCallback(async (newProductData: NewProductPayload) => {
     try {
         const newProduct = await api.addProduct(newProductData);
         setProducts(prev => [newProduct, ...prev]);
+        addAuditLog('ADD_PRODUCT', `Added new product: ${newProduct.name}`);
     } catch (error) {
         alert('Failed to add new product.');
     }
-  }, []);
+  }, [addAuditLog]);
 
   const handleAddNewUser = async (newUserData: NewUserPayload) => {
     try {
         const newUser = await api.addUser(newUserData);
         setUsers(prev => [...prev, newUser]);
+        addAuditLog('ADD_USER', `Added new user: ${newUser.name}`);
     } catch (error) {
         alert('Failed to add new user.');
     }
@@ -166,8 +175,9 @@ const App: React.FC = () => {
         const updatedUser = await api.updateUser(userId, updates);
         setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
         if (currentUser?.id === userId) {
-            setCurrentUser(updatedUser);
+            setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
         }
+        addAuditLog('UPDATE_USER', `Updated user: ${updatedUser.name}`);
     } catch (error) {
         alert('Failed to update user.');
     }
@@ -177,6 +187,7 @@ const App: React.FC = () => {
     try {
         const newCustomer = await api.addCustomer(newCustomerData);
         setCustomers(prev => [newCustomer, ...prev]);
+        addAuditLog('ADD_CUSTOMER', `Added new customer: ${newCustomer.name}`);
         return newCustomer;
     } catch(e) { 
       alert(`Error: ${e instanceof Error ? e.message : 'Failed to add customer.'}`);
@@ -188,32 +199,24 @@ const App: React.FC = () => {
      try {
         const updatedCustomer = await api.updateCustomer(id, data);
         setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
+        addAuditLog('UPDATE_CUSTOMER', `Updated customer: ${updatedCustomer.name}`);
     } catch(e) { alert(`Error: ${e instanceof Error ? e.message : 'Failed to update customer.'}`); }
   };
 
   const handleDeleteCustomer = async (id: number) => {
     try {
+        const customerName = customers.find(c => c.id === id)?.name || `ID ${id}`;
         await api.deleteCustomer(id);
         setCustomers(prev => prev.filter(c => c.id !== id));
+        addAuditLog('DELETE_CUSTOMER', `Deleted customer: ${customerName}`);
     } catch(e) { alert(`Error: ${e instanceof Error ? e.message : 'Failed to delete customer.'}`); }
   };
 
-
   const handleUpdateUserStatus = (userId: number, status: 'active' | 'inactive') => {
-    const userToUpdate = users.find(user => user.id === userId);
-    if (!userToUpdate) return;
-    
     if (currentUser?.id === userId) {
         alert(t('app.deactivateSelfError'));
         return;
     }
-
-    const adminUsers = users.filter(user => user.roleId === 'admin' && user.status === 'active');
-    if (adminUsers.length === 1 && userToUpdate.roleId === 'admin' && status === 'inactive') {
-        alert(t('app.deactivateLastAdminError'));
-        return;
-    }
-
     handleUpdateUser(userId, { status });
   };
   
@@ -221,6 +224,7 @@ const App: React.FC = () => {
      try {
         const newRole = await api.addRole(newRoleData);
         setRoles(prev => [...prev, newRole]);
+        addAuditLog('ADD_ROLE', `Added new role: ${newRole.name}`);
     } catch (error) {
         alert('Failed to add role.');
     }
@@ -230,6 +234,7 @@ const App: React.FC = () => {
     try {
         const updatedRole = await api.updateRolePermissions(roleId, permissions);
         setRoles(prev => prev.map(r => r.id === roleId ? updatedRole : r));
+        addAuditLog('UPDATE_ROLE_PERMISSIONS', `Updated permissions for role: ${updatedRole.name}`);
     } catch (error) {
         alert('Failed to update role permissions.');
     }
@@ -239,6 +244,7 @@ const App: React.FC = () => {
     try {
         const newSupplier = await api.addSupplier(newSupplierData);
         setSuppliers(prev => [...prev, newSupplier]);
+        addAuditLog('ADD_SUPPLIER', `Added new supplier: ${newSupplier.name}`);
     } catch (error) {
         alert('Failed to add supplier.');
     }
@@ -248,6 +254,7 @@ const App: React.FC = () => {
     try {
         const updatedSupplier = await api.updateSupplier(supplierId, updates);
         setSuppliers(prev => prev.map(s => s.id === supplierId ? updatedSupplier : s));
+        addAuditLog('UPDATE_SUPPLIER', `Updated supplier: ${updatedSupplier.name}`);
     } catch (error) {
          alert('Failed to update supplier.');
     }
@@ -256,10 +263,12 @@ const App: React.FC = () => {
   const handleDeleteSupplier = async (supplierId: number) => {
     if(confirm(t('app.deleteSupplierConfirm'))) {
         try {
+            const supplierName = suppliers.find(s => s.id === supplierId)?.name || `ID ${supplierId}`;
             await api.deleteSupplier(supplierId);
             setSuppliers(prev => prev.filter(s => s.id !== supplierId));
+            addAuditLog('DELETE_SUPPLIER', `Deleted supplier: ${supplierName}`);
         } catch(error) {
-            alert('Failed to delete supplier.');
+            alert(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
   };
@@ -268,6 +277,7 @@ const App: React.FC = () => {
     try {
         const newPO = await api.createPurchaseOrder(orderData);
         setPurchaseOrders(prev => [newPO, ...prev]);
+        addAuditLog('CREATE_PO', `Created Purchase Order ${newPO.id} for ${newPO.supplierName}`);
     } catch (error) {
          alert('Failed to create purchase order.');
     }
@@ -285,14 +295,16 @@ const App: React.FC = () => {
             });
             return newProducts;
         });
+        addAuditLog('RECEIVE_STOCK', `Received stock for PO ${purchaseOrderId}`);
     } catch (error) {
         alert('Failed to receive stock.');
     }
   };
 
   const handleProcessRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean) => {
+    if (!currentUser) return;
     try {
-        const { updatedOrder, newRefund, updatedProducts } = await api.processRefund(originalInvoiceId, itemsToRefund, restock);
+        const { updatedOrder, newRefund, updatedProducts } = await api.processRefund(originalInvoiceId, itemsToRefund, restock, currentUser.id);
         setRefundTransactions(prev => [newRefund, ...prev]);
         setCompletedOrders(prev => prev.map(o => o.invoiceId === originalInvoiceId ? updatedOrder : o));
         if (updatedProducts) {
@@ -347,43 +359,26 @@ const App: React.FC = () => {
     const currentQuantityInOrder = itemInOrder ? itemInOrder.quantity : 0;
 
     if (productInStock && productInStock.stock >= currentQuantityInOrder + quantity) {
-      let newOrderItems: OrderItem[] = [];
       setOrderItems((prevItems) => {
         const existingItem = prevItems.find((item) => item.id === product.id);
         if (existingItem) {
-          newOrderItems = prevItems.map((item) =>
+          return prevItems.map((item) =>
             item.id === product.id
               ? { ...item, quantity: item.quantity + quantity }
               : item
           );
         } else {
-          newOrderItems = [...prevItems, { ...product, quantity }];
+          return [...prevItems, { ...product, quantity }];
         }
-        return newOrderItems;
       });
-
-      // Fetch upsell suggestion
-      const suggestion = await getUpsellSuggestion(newOrderItems, products, businessSettings?.currency || 'USD');
-      setAiUpsellSuggestion(suggestion);
-
     } else {
       alert(`${product.name} ${t('app.outOfStock')}`);
     }
-  }, [products, orderItems, t, currentSession, businessSettings]);
+  }, [products, orderItems, t, currentSession]);
 
   const handleVoiceCommand = useCallback(async (command: string) => {
-    const itemsToAdd = await parseVoiceCommand(command, products);
-    if (itemsToAdd) {
-        for (const item of itemsToAdd) {
-            const product = products.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
-            if (product) {
-                await addToOrder(product, item.quantity);
-            }
-        }
-    } else {
-        alert("Sorry, I didn't understand that. Please try again.");
-    }
-  }, [products, addToOrder]);
+    // Voice command functionality removed
+  }, []);
   
    const handleWeightEntered = (product: Product, weight: number) => {
     if (weight <= 0) {
@@ -399,19 +394,15 @@ const App: React.FC = () => {
     const quantityChange = isEditing ? weight - itemInOrder.quantity : weight;
 
     if (productInStock.stock >= (itemInOrder?.quantity || 0) + quantityChange) {
-       let newOrderItems: OrderItem[] = [];
       setOrderItems(prevItems => {
         if (isEditing) {
-          newOrderItems = prevItems.map(item =>
+          return prevItems.map(item =>
             item.id === product.id ? { ...item, quantity: weight } : item
           );
         } else {
-          newOrderItems = [...prevItems, { ...product, quantity: weight }];
+          return [...prevItems, { ...product, quantity: weight }];
         }
-        return newOrderItems;
       });
-      // Fetch upsell suggestion after updating order
-      getUpsellSuggestion(newOrderItems, products, businessSettings?.currency || 'USD').then(setAiUpsellSuggestion);
     } else {
       alert(`${t('app.onlyStockAvailable')} ${productInStock.stock.toFixed(3)}kg ${t('app.of')} ${productInStock.name} ${t('app.inStock')}.`);
     }
@@ -420,7 +411,6 @@ const App: React.FC = () => {
 
   const removeFromOrder = useCallback((productId: number) => {
     setOrderItems((prevItems) => prevItems.filter((item) => item.id !== productId));
-    setAiUpsellSuggestion(null);
   }, []);
   
   const updateQuantity = useCallback((productId: number, newQuantity: number) => {
@@ -447,29 +437,26 @@ const App: React.FC = () => {
 
   const clearOrder = useCallback(() => {
     setOrderItems([]);
-    setAiUpsellSuggestion(null);
     setDiscount(0);
     setTip(0);
     setSelectedCustomerForOrder(null);
   }, []);
   
-  const handleParkSale = () => {
+  const handleParkSale = async () => {
     if (orderItems.length === 0) return;
     const name = prompt("Enter a name for this parked sale (e.g., 'Table 5', 'Customer's name')");
     if (name) {
-        const newParkedOrder: ParkedOrder = {
-            id: `parked-${Date.now()}`,
-            name,
-            items: orderItems,
-            parkedAt: new Date().toLocaleTimeString()
-        };
-        setParkedOrders(prev => [...prev, newParkedOrder]);
-        clearOrder();
-        // TODO: Persist parked sales in backend
+        try {
+            const newParkedOrder = await api.parkSale({ name, items: orderItems });
+            setParkedOrders(prev => [...prev, newParkedOrder]);
+            clearOrder();
+        } catch (error) {
+            alert('Failed to park sale.');
+        }
     }
   };
 
-  const handleUnparkSale = (parkedOrderId: string) => {
+  const handleUnparkSale = async (parkedOrderId: string) => {
     if (orderItems.length > 0) {
         if (!confirm('This will replace the current order. Are you sure?')) {
             return;
@@ -477,9 +464,13 @@ const App: React.FC = () => {
     }
     const orderToUnpark = parkedOrders.find(p => p.id === parkedOrderId);
     if (orderToUnpark) {
-        setOrderItems(orderToUnpark.items);
-        setParkedOrders(prev => prev.filter(p => p.id !== parkedOrderId));
-        // TODO: Persist parked sales in backend
+        try {
+            await api.unparkSale(parkedOrderId);
+            setOrderItems(orderToUnpark.items);
+            setParkedOrders(prev => prev.filter(p => p.id !== parkedOrderId));
+        } catch (error) {
+            alert('Failed to unpark sale.');
+        }
     }
   };
 
@@ -490,7 +481,10 @@ const App: React.FC = () => {
     setIsPinModalOpen(false);
     setPinEntryUser(null);
     
-    if (!currentSession) {
+    const openSession = sessionHistory.find(s => s.isOpen);
+    setCurrentSession(openSession || null);
+
+    if (!openSession) {
       setDrawerModalOpen(true);
     }
     handleUpdateUser(user.id, { lastLogin });
@@ -514,90 +508,68 @@ const App: React.FC = () => {
   };
 
   const handleLockSession = () => {
-    setIsPinModalOpen(true);
-    setPinEntryUser(currentUser);
     setCurrentUser(null);
     clearOrder();
   };
   
-  const handleOpenDrawer = (startingCash: number) => {
-    if (!currentUser && !pinEntryUser) return;
-    const user = currentUser || pinEntryUser;
+  const handleOpenDrawer = async (startingCash: number) => {
+    const user = pinEntryUser || currentUser;
     if (!user) return;
 
-    const newSession: CashDrawerSession = {
-      id: (sessionHistory[0]?.id || 0) + 1,
-      isOpen: true,
-      startingCash,
-      openedBy: user.name,
-      openedAt: new Date().toLocaleString(language),
-      activities: [],
-    };
-    
-    setCurrentSession(newSession);
-    setDrawerModalOpen(false);
-    // TODO: Persist session in backend
+    try {
+        const newSession = await api.openSession({
+            startingCash,
+            openedBy: user.name,
+            openedAt: new Date().toLocaleString(language),
+            userId: user.id
+        });
+        setCurrentSession(newSession);
+        setDrawerModalOpen(false);
+    } catch(e) {
+        alert('Failed to open cash drawer session.');
+    }
   };
 
-  const handleCloseDrawer = (countedCash: number) => {
-    if (!currentSession || (!currentUser && !pinEntryUser)) return;
-    const user = currentUser || pinEntryUser;
-    if (!user) return;
-    
-    const cashSales = currentSession.activities
-        .filter(a => a.type === 'sale' && a.paymentMethod === 'cash')
-        .reduce((sum, a) => sum + a.amount, 0);
-    const totalPayIns = currentSession.activities
-        .filter(a => a.type === 'pay-in')
-        .reduce((sum, a) => sum + a.amount, 0);
-    const totalPayOuts = currentSession.activities
-        .filter(a => a.type === 'pay-out')
-        .reduce((sum, a) => sum + a.amount, 0);
+  const handleCloseDrawer = async (countedCash: number) => {
+    if (!currentSession || !currentUser) return;
+    try {
+        const closedSession = await api.closeSession(currentSession.id, {
+            countedCash,
+            closedBy: currentUser.name,
+            closedAt: new Date().toLocaleString(language),
+            userId: currentUser.id
+        });
+        setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
+        setCurrentSession(null);
+        alert(t('app.drawerClosedAndLoggedOut'));
+        setCurrentUser(null);
+    } catch(e) {
+        alert('Failed to close cash drawer session.');
+    }
+  };
 
-    const expectedInDrawer = currentSession.startingCash + cashSales + totalPayIns - totalPayOuts;
-    const difference = countedCash - expectedInDrawer;
-
-    const closedSession: CashDrawerSession = {
-      ...currentSession,
-      isOpen: false,
-      closingCash: countedCash,
-      difference,
-      closedBy: user.name,
-      closedAt: new Date().toLocaleString(language),
+  const addActivity = async (activity: Omit<CashDrawerActivity, 'timestamp'>) => {
+    if (!currentSession || !currentUser) return;
+    const fullActivity: CashDrawerActivity = {
+        ...activity,
+        timestamp: new Date().toLocaleString(language),
     };
-
-    setSessionHistory(prev => [closedSession, ...prev]);
-    setCurrentSession(null);
-    // TODO: Persist session in backend
-    
-    alert(t('app.drawerClosedAndLoggedOut'));
-    setCurrentUser(null);
-    setPinEntryUser(null);
-    setIsPinModalOpen(false);
+    try {
+        const updatedSession = await api.addSessionActivity(currentSession.id, fullActivity, currentUser.id, currentUser.name);
+        setCurrentSession(updatedSession);
+        // Update history in case it's displayed
+        setSessionHistory(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+    } catch(e) {
+        alert(`Failed to record activity: ${activity.type}`);
+    }
   };
   
   const handlePayIn = (amount: number, reason: string) => {
-    if (!currentSession || !currentUser) return;
-    const payInActivity: CashDrawerActivity = {
-      type: 'pay-in',
-      amount,
-      timestamp: new Date().toLocaleString(language),
-      notes: reason,
-    };
-    setCurrentSession(prev => prev ? { ...prev, activities: [...prev.activities, payInActivity] } : null);
-    // TODO: Persist session in backend
+    addActivity({ type: 'pay-in', amount, notes: reason });
   };
 
   const handlePayOut = (amount: number, reason: string) => {
-    if (!currentSession || !currentUser) return;
-     const payOutActivity: CashDrawerActivity = {
-      type: 'pay-out',
-      amount,
-      timestamp: new Date().toLocaleString(language),
-      notes: reason,
-    };
-    setCurrentSession(prev => prev ? { ...prev, activities: [...prev.activities, payOutActivity] } : null);
-    // TODO: Persist session in backend
+    addActivity({ type: 'pay-out', amount, notes: reason });
   };
 
   const handlePaymentSuccess = async (paymentMethod: PaymentMethod) => {
@@ -612,10 +584,10 @@ const App: React.FC = () => {
             tip,
             discount,
             selectedCustomerForOrder?.id,
-            selectedCustomerForOrder?.name
+            selectedCustomerForOrder?.name,
+            currentUser.id
         );
         
-        // Update local state
         setCompletedOrders(prev => [newOrder, ...prev]);
         setProducts(prev => {
             const newProducts = [...prev];
@@ -626,17 +598,13 @@ const App: React.FC = () => {
             return newProducts;
         });
 
-        // Add cash drawer activity if needed
         if (currentSession) {
-             const saleActivity: CashDrawerActivity = {
+             addActivity({
                 type: 'sale',
                 amount: newOrder.total,
-                timestamp: new Date().toLocaleString(language),
                 orderId: newOrder.invoiceId,
                 paymentMethod,
-            };
-            setCurrentSession(prev => prev ? { ...prev, activities: [...prev.activities, saleActivity] } : null);
-            // TODO: Persist session update in backend
+            });
         }
 
         clearOrder();
@@ -645,8 +613,6 @@ const App: React.FC = () => {
     } catch (error) {
         console.error("Payment processing failed:", error);
         alert(`Payment processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        // Optionally, reload data to ensure consistency
-        await loadInitialData();
     }
   };
 
@@ -656,15 +622,15 @@ const App: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div className="flex items-center justify-center h-screen text-red-500 p-4">Error: {error}</div>;
   }
   
   if (!businessSettings) {
-      return <div>Error: Business settings not loaded.</div>;
+      return <div className="flex items-center justify-center h-screen">Error: Business settings not loaded.</div>;
   }
 
   return (
@@ -696,7 +662,7 @@ const App: React.FC = () => {
             isDrawerModalOpen={isDrawerModalOpen}
             isPinModalOpen={isPinModalOpen}
             pinEntryUser={pinEntryUser}
-            aiUpsellSuggestion={aiUpsellSuggestion}
+            aiUpsellSuggestion={null}
             discount={discount}
             tip={tip}
             selectedCustomerForOrder={selectedCustomerForOrder}
@@ -733,7 +699,6 @@ const App: React.FC = () => {
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
-            // Fix: Assign correct handler functions to props.
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}

@@ -24,15 +24,19 @@ import type {
   CustomerUpdatePayload,
   AppSettings,
   ThemeName,
+  CashDrawerSession,
+  CashDrawerActivity,
+  ParkedOrder,
 } from '../types';
 import type { Currency } from '../currencies';
 
 // Helper to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API Error:', errorText);
-    throw new Error(`API request failed: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+    const errorMessage = errorBody.error || response.statusText;
+    console.error('API Error:', errorMessage, errorBody);
+    throw new Error(`API request failed: ${errorMessage}`);
   }
   return response.json() as Promise<T>;
 }
@@ -163,7 +167,6 @@ export const updateCurrencies = async (currencies: Currency[]): Promise<Currency
 
 
 // --- AUDIT LOG ---
-// This is now handled by the backend automatically. We can keep this if we need manual logs.
 export const addAuditLog = async (userId: number, userName: string, action: string, details: string): Promise<AuditLog> => {
    const response = await fetch('/api/audit-logs', {
     method: 'POST',
@@ -182,8 +185,9 @@ export const processPayment = async (
     paymentMethod: PaymentMethod,
     tip: number,
     discount: number,
-    customerId?: number | null,
-    customerName?: string,
+    customerId: number | null | undefined,
+    customerName: string | undefined,
+    userId: number,
 ): Promise<{ updatedProducts: {id: number, stock: number}[], newOrder: CompletedOrder }> => {
     const response = await fetch('/api/orders/payment', {
         method: 'POST',
@@ -196,22 +200,37 @@ export const processPayment = async (
             tip,
             discount,
             customerId,
-            customerName
+            customerName,
+            userId,
         }),
     });
     return handleResponse<{ updatedProducts: {id: number, stock: number}[], newOrder: CompletedOrder }>(response);
 };
 
 
-export const processRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean): Promise<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }> => {
+export const processRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean, userId: number): Promise<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }> => {
   const response = await fetch(`/api/orders/refund`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ originalInvoiceId, itemsToRefund, restock }),
+    body: JSON.stringify({ originalInvoiceId, itemsToRefund, restock, userId }),
   });
   return handleResponse<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }>(response);
 };
 
+// --- PARKED ORDERS ---
+export const parkSale = async (orderData: { name: string; items: OrderItem[] }): Promise<ParkedOrder> => {
+    const response = await fetch('/api/parked-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+    });
+    return handleResponse<ParkedOrder>(response);
+};
+
+export const unparkSale = async (parkedOrderId: string): Promise<{ success: boolean }> => {
+    const response = await fetch(`/api/parked-orders/${parkedOrderId}`, { method: 'DELETE' });
+    return handleResponse<{ success: boolean }>(response);
+};
 
 // --- SUPPLIERS ---
 export const addSupplier = async (supplierData: NewSupplierPayload): Promise<Supplier> => {
@@ -261,4 +280,32 @@ export const receiveStock = async (purchaseOrderId: string, receivedQuantities: 
 export const fetchLatestCurrencyRates = async (): Promise<{ currencies: Currency[], businessSettings: BusinessSettings }> => {
   const response = await fetch('/api/currencies/fetch-rates', { method: 'POST' });
   return handleResponse<{ currencies: Currency[], businessSettings: BusinessSettings }>(response);
+};
+
+// --- CASH DRAWER SESSIONS ---
+export const openSession = async (sessionData: { startingCash: number; openedBy: string; openedAt: string; userId: number; }): Promise<CashDrawerSession> => {
+  const response = await fetch('/api/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionData),
+  });
+  return handleResponse<CashDrawerSession>(response);
+};
+
+export const addSessionActivity = async (sessionId: number, activity: CashDrawerActivity, userId: number, userName: string): Promise<CashDrawerSession> => {
+    const response = await fetch(`/api/sessions/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, activity, userId, userName }),
+    });
+    return handleResponse<CashDrawerSession>(response);
+};
+
+export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedBy: string; closedAt: string; userId: number; }): Promise<CashDrawerSession> => {
+    const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(closingData),
+    });
+    return handleResponse<CashDrawerSession>(response);
 };

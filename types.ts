@@ -42,12 +42,6 @@ export interface ParkedOrder {
   parkedAt: string;
 }
 
-
-export interface ChatMessage {
-    sender: 'user' | 'assistant';
-    text: string;
-}
-
 // Updated granular permissions
 export type Permission =
   | 'CAN_PROCESS_PAYMENTS'
@@ -285,4 +279,5 @@ export interface InitialData {
     sessionHistory: CashDrawerSession[];
     auditLogs: AuditLog[];
     currencies: Currency[];
+    parkedOrders: ParkedOrder[];
 }

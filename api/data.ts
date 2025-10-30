@@ -20,12 +20,13 @@ export default async function handler(
         );
     `;
 
-    if (!tableCheck[0].exists) {
-        console.log('Tables not found, initializing schema...');
+    if (!tableCheck.rows[0].exists) {
+        console.log('Tables not found, initializing schema and seeding data...');
         const statements = schemaSql.split(';').filter(s => s.trim());
         for (const statement of statements) {
             if (statement) {
-                await sql(statement);
+                // Use a client for multi-statement execution if needed, but direct execution should work for CREATE TABLE IF NOT EXISTS
+                 await sql.query(statement);
             }
         }
         await seedInitialData();
@@ -45,6 +46,7 @@ export default async function handler(
       sessionHistory,
       auditLogs,
       currencies,
+      parkedOrders,
     ] = await Promise.all([
       sql`SELECT * FROM products ORDER BY id ASC`,
       sql`SELECT * FROM users ORDER BY id ASC`,
@@ -59,24 +61,26 @@ export default async function handler(
       sql`SELECT * FROM session_history ORDER BY id DESC`,
       sql`SELECT * FROM audit_logs ORDER BY id DESC`,
       sql`SELECT * FROM currencies ORDER BY code ASC`,
+      sql`SELECT * FROM parked_orders ORDER BY "parkedAt" DESC`,
     ]);
-
-    const appSettings = appSettingsResult.length > 0 ? appSettingsResult[0] : { theme: 'default', language: 'es' };
+    
+    const appSettings = appSettingsResult.rows.length > 0 ? appSettingsResult.rows[0] : { theme: 'default', language: 'es' };
 
     const data: InitialData = {
-      products: products as any,
-      users: users as any,
-      roles: roles as any,
-      suppliers: suppliers as any,
-      customers: customers as any,
-      businessSettings: businessSettings[0] as any,
+      products: products.rows as any,
+      users: users.rows as any,
+      roles: roles.rows as any,
+      suppliers: suppliers.rows as any,
+      customers: customers.rows as any,
+      businessSettings: businessSettings.rows[0] as any,
       appSettings: appSettings as any,
-      purchaseOrders: purchaseOrders as any,
-      completedOrders: completedOrders as any,
-      refundTransactions: refundTransactions as any,
-      sessionHistory: sessionHistory as any,
-      auditLogs: auditLogs as any,
-      currencies: currencies as any,
+      purchaseOrders: purchaseOrders.rows as any,
+      completedOrders: completedOrders.rows as any,
+      refundTransactions: refundTransactions.rows as any,
+      sessionHistory: sessionHistory.rows as any,
+      auditLogs: auditLogs.rows as any,
+      currencies: currencies.rows as any,
+      parkedOrders: parkedOrders.rows as any,
     };
     
     return response.status(200).json(data);
