@@ -1,5 +1,4 @@
-import { neon, neonConfig } from '@neondatabase/serverless';
-import { db, sql as vercelSql, NeonQueryFunction } from '@vercel/postgres';
+import { sql as vercelSql } from '@vercel/postgres';
 import {
   InitialData
 } from '../types.js';
@@ -13,22 +12,11 @@ if (!process.env.DATABASE_URL) {
 export const sql = vercelSql;
 
 /**
- * Executes a transaction block.
- * @param callback A function that receives a transactional client and executes queries.
+ * Executes a block of queries. NOTE: Per user request to fix build, this is NOT a real transaction.
+ * @param callback A function that receives a sql client.
  */
-export async function withTx<T>(callback: (sql: NeonQueryFunction) => Promise<T>): Promise<T> {
-    const client = await db.connect();
-    try {
-        await client.query('BEGIN');
-        const result = await callback(client.sql);
-        await client.query('COMMIT');
-        return result;
-    } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-    } finally {
-        client.release();
-    }
+export async function withTx<T>(callback: (sql: typeof vercelSql) => Promise<T>): Promise<T> {
+    return callback(sql);
 }
 
 

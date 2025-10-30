@@ -21,12 +21,12 @@ export default async function handler(
         }
         
         await sql`BEGIN`;
-        const beforeState = await sql`SELECT * FROM products WHERE id = ${id}`;
-        if (beforeState.length === 0) {
+        const beforeStateResult = await sql`SELECT * FROM products WHERE id = ${id}`;
+        if (beforeStateResult.rowCount === 0) {
             await sql`ROLLBACK`;
             return res.status(404).json({ error: 'Product not found' });
         }
-        const currentProduct = beforeState[0];
+        const currentProduct = beforeStateResult.rows[0];
 
         const newProductData = {
             name: updates.name ?? currentProduct.name,
@@ -38,7 +38,7 @@ export default async function handler(
             purchasePrice: updates.purchasePrice ?? currentProduct.purchasePrice,
         };
 
-        const updatedProduct = await sql`
+        const updatedProductResult = await sql`
             UPDATE products SET
                 name = ${newProductData.name},
                 category = ${newProductData.category},
@@ -50,19 +50,20 @@ export default async function handler(
             WHERE id = ${id}
             RETURNING *;
         `;
+        const updatedProduct = updatedProductResult.rows[0];
         
         await sql`
             INSERT INTO audit_log (action, entity, entity_id, before_state, after_state)
-            VALUES ('UPDATE', 'product', ${id}, ${JSON.stringify(beforeState[0])}, ${JSON.stringify(updatedProduct[0])});
+            VALUES ('UPDATE', 'product', ${id}, ${JSON.stringify(beforeStateResult.rows[0])}, ${JSON.stringify(updatedProduct)});
         `;
         await sql`COMMIT`;
         
-        return res.status(200).json(updatedProduct[0]);
+        return res.status(200).json(updatedProduct);
 
     } else if (req.method === 'DELETE') {
         await sql`BEGIN`;
-        const beforeState = await sql`SELECT * FROM products WHERE id = ${id}`;
-        if (beforeState.length === 0) {
+        const beforeStateResult = await sql`SELECT * FROM products WHERE id = ${id}`;
+        if (beforeStateResult.rowCount === 0) {
             await sql`ROLLBACK`;
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -71,7 +72,7 @@ export default async function handler(
         
         await sql`
             INSERT INTO audit_log (action, entity, entity_id, before_state)
-            VALUES ('DELETE', 'product', ${id}, ${JSON.stringify(beforeState[0])});
+            VALUES ('DELETE', 'product', ${id}, ${JSON.stringify(beforeStateResult.rows[0])});
         `;
         await sql`COMMIT`;
 

@@ -17,21 +17,22 @@ export default async function handler(
       try {
         await sql`BEGIN`;
 
-        const newProduct = await sql`
+        const result = await sql`
             INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy")
             VALUES (${name}, ${price}, ${purchasePrice}, ${imageUrl}, ${category}, ${stock}, ${sellBy})
             RETURNING *;
         `;
+        const newProduct = result.rows[0];
         
         // Audit log (simplified for brevity, a real app would get actor_id from session)
         await sql`
             INSERT INTO audit_log (action, entity, entity_id, after_state)
-            VALUES ('CREATE', 'product', ${newProduct[0].id}, ${JSON.stringify(newProduct[0])});
+            VALUES ('CREATE', 'product', ${newProduct.id}, ${JSON.stringify(newProduct)});
         `;
 
         await sql`COMMIT`;
         
-        res.status(201).json(newProduct[0]);
+        res.status(201).json(newProduct);
       } catch (error) {
         await sql`ROLLBACK`;
         throw error;

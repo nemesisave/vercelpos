@@ -9,7 +9,7 @@ export default async function handler(
     const statements = schemaSql.split(';').filter(s => s.trim());
     for (const statement of statements) {
         if (statement) {
-            await sql(statement);
+            await sql.query(statement);
         }
     }
     await seedInitialData();

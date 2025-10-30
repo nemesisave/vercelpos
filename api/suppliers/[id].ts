@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (req.method === 'DELETE') {
         // Check if supplier is used in purchase orders
         const poCheck = await sql`SELECT 1 FROM purchase_orders WHERE "supplierId" = ${id} LIMIT 1;`;
-        if (poCheck.rowCount > 0) {
+        if (poCheck.rowCount && poCheck.rowCount > 0) {
             return res.status(400).json({ error: 'Cannot delete supplier with existing purchase orders.' });
         }
 

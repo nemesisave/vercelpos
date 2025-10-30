@@ -51,10 +51,10 @@ export default async function handler(
         WHERE id = ${item.id} AND stock >= ${item.quantity}
         RETURNING id, stock;
       `;
-      if (result.length === 0) {
+      if (result.rowCount === 0) {
         throw new Error(`Insufficient stock for product ID ${item.id}`);
       }
-      updatedProducts.push(result[0] as { id: number; stock: number });
+      updatedProducts.push(result.rows[0] as { id: number; stock: number });
     }
 
     // 3. Create completed order

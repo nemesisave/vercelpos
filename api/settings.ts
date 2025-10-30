@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from './_db.js';
-import { BusinessSettings } from '../../types.js';
+import type { BusinessSettings } from '../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'PUT') {
