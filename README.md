@@ -16,12 +16,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1cyWHkBNC_3gbBZal9aOCQ1
     ```bash
     npm install
     ```
-2.  **Set up environment variables:**
-    Create a file named `.env` in the root of the project and add your Gemini API key:
-    ```
-    GEMINI_API_KEY=YOUR_API_KEY_HERE
-    ```
-3.  **Run the app:**
+2.  **Run the app:**
     ```bash
     npm run dev
     ```
@@ -30,6 +25,5 @@ View your app in AI Studio: https://ai.studio/apps/drive/1cyWHkBNC_3gbBZal9aOCQ1
 
 1.  Push your code to a GitHub, GitLab, or Bitbucket repository.
 2.  Import the repository into a new Vercel project.
-3.  Configure the Environment Variable `GEMINI_API_KEY` in the Vercel project settings.
-4.  In your Vercel project settings, navigate to **General → Node.js Version** and select **22.x**.
-5.  Deploy. Your app will be live.
+3.  In your Vercel project settings, navigate to **General → Node.js Version** and select **22.x**.
+4.  Deploy. Your app will be live.
