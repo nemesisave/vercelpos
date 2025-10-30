@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS products (
 
 CREATE TABLE IF NOT EXISTS suppliers (
     id SERIAL PRIMARY KEY,
-    name TEXT,
+    name TEXT UNIQUE,
     "contactPerson" TEXT,
     phone TEXT,
     email TEXT,
@@ -234,7 +234,7 @@ export async function seedInitialData() {
     }
 
     for (const supplier of MOCK_SUPPLIERS) {
-        await sql`INSERT INTO suppliers (name, "contactPerson", phone, email, address, notes) VALUES (${supplier.name}, ${supplier.contactPerson}, ${supplier.phone}, ${supplier.email}, ${supplier.address}, ${supplier.notes}) ON CONFLICT (id) DO NOTHING;`;
+        await sql`INSERT INTO suppliers (name, "contactPerson", phone, email, address, notes) VALUES (${supplier.name}, ${supplier.contactPerson}, ${supplier.phone}, ${supplier.email}, ${supplier.address}, ${supplier.notes}) ON CONFLICT (name) DO NOTHING;`;
     }
 }
 
