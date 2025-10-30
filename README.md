@@ -1,11 +1,35 @@
 <div align="center">
-
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-
-  <h1>Built with AI Studio</h2>
-
-  <p>The fastest path from prompt to production with Gemini.</p>
-
-  <a href="https://aistudio.google.com/apps">Start building</a>
-
 </div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1cyWHkBNC_3gbBZal9aOCQ1hh9QNiKOwq
+
+## Run Locally
+
+**Prerequisites:**  Node.js (version 22.x recommended)
+
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+2.  **Set up environment variables:**
+    Create a file named `.env` in the root of the project and add your Gemini API key:
+    ```
+    GEMINI_API_KEY=YOUR_API_KEY_HERE
+    ```
+3.  **Run the app:**
+    ```bash
+    npm run dev
+    ```
+
+## Deploy to Vercel
+
+1.  Push your code to a GitHub, GitLab, or Bitbucket repository.
+2.  Import the repository into a new Vercel project.
+3.  Configure the Environment Variable `GEMINI_API_KEY` in the Vercel project settings.
+4.  In your Vercel project settings, navigate to **General → Node.js Version** and select **22.x**.
+5.  Deploy. Your app will be live.
