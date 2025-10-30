@@ -19,7 +19,7 @@ export default async function handler(
 
         const result = await sql`
             INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy")
-            VALUES (${name}, ${price}, ${purchasePrice}, ${imageUrl}, ${category}, ${stock}, ${sellBy})
+            VALUES (${name}, ${JSON.stringify(price)}, ${JSON.stringify(purchasePrice)}, ${imageUrl}, ${category}, ${stock}, ${sellBy})
             RETURNING *;
         `;
         const newProduct = result.rows[0];

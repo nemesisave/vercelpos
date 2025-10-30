@@ -45,8 +45,8 @@ export default async function handler(
                 "imageUrl" = ${newProductData.imageUrl},
                 "sellBy" = ${newProductData.sellBy},
                 stock = ${newProductData.stock},
-                price = ${newProductData.price},
-                "purchasePrice" = ${newProductData.purchasePrice}
+                price = ${JSON.stringify(newProductData.price)},
+                "purchasePrice" = ${JSON.stringify(newProductData.purchasePrice)}
             WHERE id = ${id}
             RETURNING *;
         `;
