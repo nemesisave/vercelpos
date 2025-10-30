@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { Permission, Role } from '../types';
 import { useTranslations } from '../context/LanguageContext';
 import { ALL_PERMISSIONS, PERMISSION_GROUPS } from '../constants';
-import { getRolePermissionSuggestions } from '../services/geminiService';
 
 interface AddRoleModalProps {
   isOpen: boolean;
@@ -13,7 +12,6 @@ interface AddRoleModalProps {
 const AddRoleModal: React.FC<AddRoleModalProps> = ({ isOpen, onClose, onAddRole }) => {
   const [name, setName] = useState('');
   const [permissions, setPermissions] = useState<Set<Permission>>(new Set());
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const { t } = useTranslations();
   
   if (!isOpen) return null;
@@ -26,21 +24,6 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ isOpen, onClose, onAddRole 
       newPermissions.delete(permission);
     }
     setPermissions(newPermissions);
-  };
-  
-  const handleSuggestPermissions = async () => {
-    if (!name.trim()) {
-      alert(t('addRoleModal.enterNameFirst'));
-      return;
-    }
-    setIsSuggesting(true);
-    const suggested = await getRolePermissionSuggestions(name);
-    if (suggested.length > 0) {
-        setPermissions(new Set(suggested));
-    } else {
-        alert(t('addRoleModal.suggestionError'));
-    }
-    setIsSuggesting(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,19 +54,6 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ isOpen, onClose, onAddRole 
             <label htmlFor="role-name" className="block text-sm font-medium text-gray-700">{t('addRoleModal.roleName')}</label>
             <div className="flex items-center space-x-2 mt-1">
                 <input type="text" id="role-name" value={name} onChange={e => setName(e.target.value)} className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required />
-                <button 
-                    type="button" 
-                    onClick={handleSuggestPermissions}
-                    disabled={isSuggesting}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-400"
-                >
-                    {isSuggesting ? (
-                         <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    ) : (
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
-                    )}
-                    <span>{t('addRoleModal.suggest')}</span>
-                </button>
             </div>
           </div>
           <div>

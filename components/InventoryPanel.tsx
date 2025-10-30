@@ -21,9 +21,6 @@ import { useDebounce } from '../hooks/useDebounce';
 import SalesHistoryTab from './SalesHistoryTab';
 import AddRoleModal from './AddRoleModal';
 import AuditLogTab from './AuditLogTab';
-import UserActivityAnalysisModal from './UserActivityAnalysisModal';
-import { analyzeUserActivity } from '../services/geminiService';
-
 
 interface InventoryPanelProps {
   isOpen: boolean;
@@ -527,10 +524,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [isAddRoleModalOpen, setAddRoleModalOpen] = useState(false);
-  const [isAnalysisModalOpen, setAnalysisModalOpen] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzedUser, setAnalyzedUser] = useState<User | null>(null);
 
   const [settings, setSettings] = useState({
     ...businessSettings,
@@ -600,23 +593,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
         setUserToDeactivate(null);
     }
   }
-  
-  const handleAnalyzeActivity = async (userToAnalyze: User) => {
-    setAnalyzedUser(userToAnalyze);
-    setIsAnalyzing(true);
-    setAnalysisResult('');
-    setAnalysisModalOpen(true);
-    try {
-        const userLogs = auditLogs.filter(log => log.userId === userToAnalyze.id);
-        const result = await analyzeUserActivity(userToAnalyze.name, userLogs);
-        setAnalysisResult(result);
-    } catch (error) {
-        console.error(error);
-        setAnalysisResult(t('analysisModal.error'));
-    } finally {
-        setIsAnalyzing(false);
-    }
-  };
 
   const handleRateInputChange = (code: string, value: string) => {
     setManualRates(prev => ({ ...prev, [code]: value }));
@@ -873,7 +849,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
                                         </div>
                                     </div>
                                     <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
-                                        <button onClick={() => handleAnalyzeActivity(u)} className="text-sm font-medium text-indigo-600 hover:text-indigo-900" title={t('adminPanel.users.analyzeActivity')}><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg></button>
                                         <button onClick={() => openEditUserModal(u)} className="text-sm font-medium text-blue-600 hover:text-blue-900">{t('adminPanel.users.edit')}</button>
                                         <button onClick={() => openDeactivateConfirmModal(u)} disabled={user.id === u.id} className="text-sm font-medium text-red-600 hover:text-red-900 disabled:text-gray-300 disabled:cursor-not-allowed">
                                             {u.status === 'active' ? t('adminPanel.users.deactivate') : t('adminPanel.users.activate')}
@@ -1156,13 +1131,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
                 isOpen={isAddRoleModalOpen}
                 onClose={() => setAddRoleModalOpen(false)}
                 onAddRole={onAddRole}
-             />
-             <UserActivityAnalysisModal
-                isOpen={isAnalysisModalOpen}
-                onClose={() => setAnalysisModalOpen(false)}
-                isLoading={isAnalyzing}
-                analysisText={analysisResult}
-                userName={analyzedUser?.name || ''}
              />
         </>
        )}

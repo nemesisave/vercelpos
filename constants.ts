@@ -14,8 +14,6 @@ export const ALL_PERMISSIONS: Permission[] = [
     'CAN_MANAGE_CUSTOMERS',
     'CAN_MANAGE_CASH_DRAWER',
     'CAN_MANAGE_BUSINESS_SETTINGS',
-    // FIX: Add CAN_GENERATE_AI_ANALYSIS permission for AI features
-    'CAN_GENERATE_AI_ANALYSIS',
 ];
 
 // Define permission groups for UI organization
@@ -26,8 +24,7 @@ export const PERMISSION_GROUPS: { [key: string]: { labelKey: string; permissions
     },
     reports: {
         labelKey: 'permissions.permissionGroup_reports',
-        // FIX: Add CAN_GENERATE_AI_ANALYSIS permission for AI features
-        permissions: ['CAN_VIEW_DASHBOARD_REPORTS', 'CAN_VIEW_SALES_HISTORY', 'CAN_GENERATE_AI_ANALYSIS']
+        permissions: ['CAN_VIEW_DASHBOARD_REPORTS', 'CAN_VIEW_SALES_HISTORY']
     },
     inventory: {
         labelKey: 'permissions.permissionGroup_inventory',

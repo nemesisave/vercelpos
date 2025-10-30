@@ -2,8 +2,6 @@ import React, { useMemo, useState } from 'react';
 import type { CompletedOrder, Product } from '../types';
 import { useTranslations } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { getBusinessAnalysis } from '../services/geminiService';
-import AnalysisModal from './AnalysisModal';
 import { usePermissions } from '../hooks/usePermissions';
 
 interface DashboardTabProps {
@@ -76,9 +74,6 @@ const DateFilterButton: React.FC<DateFilterButtonProps> = ({ value, label, curre
 const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, permissions }) => {
   const { t } = useTranslations();
   const { formatCurrency, baseCurrencyCode } = useCurrency();
-  const [isAnalysisModalOpen, setAnalysisModalOpen] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>('all');
 
   const filteredOrders = useMemo(() => {
@@ -163,21 +158,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
 
   }, [filteredOrders, products, formatCurrency, baseCurrencyCode]);
 
-  const handleGenerateAnalysis = async () => {
-    setIsAnalyzing(true);
-    setAnalysisResult('');
-    setAnalysisModalOpen(true);
-    try {
-        const result = await getBusinessAnalysis(products, filteredOrders, baseCurrencyCode);
-        setAnalysisResult(result);
-    } catch (error) {
-        console.error(error);
-        setAnalysisResult(t('analysisModal.error'));
-    } finally {
-        setIsAnalyzing(false);
-    }
-  };
-
   if (completedOrders.length === 0) {
     return (
       <div className="flex-grow flex flex-col items-center justify-center text-center p-4 bg-gray-50">
@@ -201,15 +181,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
                 <DateFilterButton value="month" label={t('adminPanel.dashboard.filterMonth')} currentDateRange={dateRange} onClick={setDateRange} />
                 <DateFilterButton value="all" label={t('adminPanel.dashboard.filterAll')} currentDateRange={dateRange} onClick={setDateRange} />
             </div>
-            <button
-              onClick={handleGenerateAnalysis}
-              disabled={isAnalyzing || !permissions.CAN_GENERATE_AI_ANALYSIS}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-wait transition-colors"
-              title={!permissions.CAN_GENERATE_AI_ANALYSIS ? t('app.permissionDenied') : ''}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
-              <span>{isAnalyzing ? t('analysisModal.analyzing') : t('analysisModal.generateButton')}</span>
-            </button>
         </div>
       </div>
 
@@ -229,13 +200,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
            <p className="text-sm text-gray-500">Placeholder for another detailed view.</p>
         </div>
       </div>
-      
-      <AnalysisModal
-        isOpen={isAnalysisModalOpen}
-        onClose={() => setAnalysisModalOpen(false)}
-        isLoading={isAnalyzing}
-        analysisText={analysisResult}
-      />
     </div>
   );
 };

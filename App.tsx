@@ -376,7 +376,6 @@ const App: React.FC = () => {
     }
   }, [products, orderItems, t, currentSession]);
 
-  // FIX: Removed unused handleVoiceCommand
    const handleWeightEntered = (product: Product, weight: number) => {
     if (weight <= 0) {
       setProductToWeigh(null);

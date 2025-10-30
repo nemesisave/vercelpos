@@ -1,7 +1,5 @@
 {
   "name": "Vercel POS",
-  "description": "A modern, AI-powered Point of Sale (POS) system built with React and Tailwind CSS. Features a dynamic product grid, real-time order summary, and a smart assistant powered by the Gemini API to answer questions and provide suggestions.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "description": "A modern Point of Sale (POS) system built with React and Tailwind CSS. Features a dynamic product grid and real-time order summary.",
+  "requestFramePermissions": []
 }
