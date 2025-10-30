@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { withTx } from '../_db.js';
+import { withTx, ensureDbInitialized } from '../_db.js';
 import { UserUpdatePayload } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  await ensureDbInitialized();
   const { id } = req.query;
 
   if (typeof id !== 'string') {

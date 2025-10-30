@@ -419,9 +419,9 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const inventoryStats = useMemo(() => {
-    const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
-    const totalValue = products.reduce((sum, p) => sum + (p.stock * (p.purchasePrice[baseCurrencyCode] || 0)), 0);
-    const potentialRevenue = products.reduce((sum, p) => sum + (p.stock * (p.price[baseCurrencyCode] || 0)), 0);
+    const totalUnits = products.reduce((sum, p) => sum + Number(p.stock), 0);
+    const totalValue = products.reduce((sum, p) => sum + (Number(p.stock) * (p.purchasePrice[baseCurrencyCode] || 0)), 0);
+    const potentialRevenue = products.reduce((sum, p) => sum + (Number(p.stock) * (p.price[baseCurrencyCode] || 0)), 0);
     const uniqueSKUs = products.length;
     return { totalUnits, totalValue, potentialRevenue, uniqueSKUs };
   }, [products, baseCurrencyCode]);
@@ -686,7 +686,7 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
                             <StatCard title={t('adminPanel.inventory.potentialRevenue')} value={formatCurrency(inventoryStats.potentialRevenue)} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>} />
                         )}
                         <StatCard title={t('adminPanel.inventory.totalSKUs')} value={inventoryStats.uniqueSKUs} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>} />
-                        <StatCard title={t('adminPanel.inventory.totalUnits')} value={inventoryStats.totalUnits.toLocaleString()} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>} />
+                        <StatCard title={t('adminPanel.inventory.totalUnits')} value={inventoryStats.totalUnits.toLocaleString(undefined, { maximumFractionDigits: 3 })} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>} />
                     </div>
 
                     {/* Controls */}

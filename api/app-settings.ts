@@ -1,10 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from './_db.js';
+import { sql, ensureDbInitialized } from './_db.js';
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
 ) {
+    await ensureDbInitialized();
     if (req.method === 'GET') {
         try {
             const { rows: settings } = await sql`SELECT theme, language FROM app_settings WHERE id = 1`;

@@ -1,8 +1,9 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '../_db.js';
+import { sql, ensureDbInitialized } from '../_db.js';
 import { CashDrawerActivity, CashDrawerSession } from '../../types.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  await ensureDbInitialized();
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }
@@ -15,20 +16,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userName: string;
     };
 
-    const sessionResult = await sql`SELECT * FROM session_history WHERE id = ${sessionId}`;
-    if (sessionResult.rows.length === 0 || !(sessionResult.rows[0] as any).isOpen) {
-      return res.status(400).json({ error: 'Session not found or is closed' });
-    }
-
-    const currentActivities = (sessionResult.rows[0] as any).activities || [];
-    const newActivities = [...currentActivities, activity];
-
     const result = await sql`
       UPDATE session_history
-      SET activities = ${JSON.stringify(newActivities)}
-      WHERE id = ${sessionId}
+      SET activities = activities || ${JSON.stringify(activity)}::jsonb
+      WHERE id = ${sessionId} AND "isOpen" = true
       RETURNING *;
     `;
+    
+    if (result.rowCount === 0) {
+      return res.status(400).json({ error: 'Session not found or is closed' });
+    }
     const updatedSession = result.rows[0];
 
     await sql`
