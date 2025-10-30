@@ -20,6 +20,7 @@ export default async function handler(
     discount,
     customerId,
     customerName,
+    userId,
   } = req.body as {
     orderItems: OrderItem[],
     businessSettings: BusinessSettings,
@@ -29,6 +30,7 @@ export default async function handler(
     discount: number,
     customerId?: number | null,
     customerName?: string,
+    userId: number,
   };
 
   try {
@@ -79,8 +81,8 @@ export default async function handler(
 
     // 4. Audit log
     await sql`
-        INSERT INTO audit_log (action, entity, entity_id, after_state, metadata)
-        VALUES ('CREATE', 'completed_order', ${invoiceId}, ${JSON.stringify(fullNewOrder)}, ${JSON.stringify({ cashier: cashierName }) });
+        INSERT INTO audit_logs (user_id, user_name, action, details)
+        VALUES (${userId}, ${cashierName}, 'PROCESS_PAYMENT', ${`Processed payment for order ${invoiceId}, Total: ${fullNewOrder.total}`});
     `;
 
     await sql`COMMIT`;

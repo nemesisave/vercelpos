@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { password: _, ...updatedUser } = result.rows[0];
         
         await tx`
-          INSERT INTO audit_logs ("userId", "userName", action, details)
+          INSERT INTO audit_logs (user_id, user_name, action, details)
           VALUES (${id}, ${updatedUser.name}, 'UPDATE_USER', ${`Updated user details for ${updatedUser.name}`});
         `;
 

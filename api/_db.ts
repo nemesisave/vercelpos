@@ -161,9 +161,9 @@ CREATE TABLE IF NOT EXISTS parked_orders (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id SERIAL PRIMARY KEY,
-    "timestamp" TIMESTAMPTZ DEFAULT NOW(),
-    "userId" INT,
-    "userName" TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    user_id INT,
+    user_name TEXT,
     action TEXT,
     details TEXT
 );
@@ -263,6 +263,12 @@ export async function ensureDbInitialized() {
 
     await sql`ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;`;
     await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
+
+    // Ensure audit_logs table has the correct snake_case columns
+    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INT;`;
+    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name TEXT;`;
+    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action TEXT;`;
+    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;`;
     
     await seedInitialData();
     isDbInitialized = true;

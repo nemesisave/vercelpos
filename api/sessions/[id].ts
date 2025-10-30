@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const closedSession = result.rows[0];
 
     await sql`
-      INSERT INTO audit_logs ("userId", "userName", action, details)
+      INSERT INTO audit_logs (user_id, user_name, action, details)
       VALUES (${userId}, ${closedBy}, 'CLOSE_CASH_DRAWER', ${`Closed session #${id} with difference of ${difference.toFixed(2)}`});
     `;
 

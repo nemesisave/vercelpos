@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // For simplicity, let's assume a user ID is passed or available from session
       // Here we will use a placeholder
       await sql`
-        INSERT INTO audit_logs ("userId", "userName", action, details)
+        INSERT INTO audit_logs (user_id, user_name, action, details)
         VALUES (1, 'System', 'CREATE_USER', ${`Created new user: ${newUser.name} (@${newUser.username})`});
       `;
 

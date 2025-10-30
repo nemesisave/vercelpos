@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const updatedSession = result.rows[0];
 
     await sql`
-      INSERT INTO audit_logs ("userId", "userName", action, details)
+      INSERT INTO audit_logs (user_id, user_name, action, details)
       VALUES (${userId}, ${userName}, 'CASH_DRAWER_ACTIVITY', ${`Activity: ${activity.type}, Amount: ${activity.amount}, Notes: ${activity.notes || activity.orderId || 'N/A'}`});
     `;
 

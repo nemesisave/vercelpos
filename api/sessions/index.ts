@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const newSession = result.rows[0];
 
     await sql`
-      INSERT INTO audit_logs ("userId", "userName", action, details)
+      INSERT INTO audit_logs (user_id, user_name, action, details)
       VALUES (${userId}, ${openedBy}, 'OPEN_CASH_DRAWER', ${`Opened session #${newSession.id} with starting cash of ${startingCash}`});
     `;
     

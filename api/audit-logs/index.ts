@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
       
       const result = await sql`
-        INSERT INTO audit_logs ("userId", "userName", action, details)
+        INSERT INTO audit_logs (user_id, user_name, action, details)
         VALUES (${userId}, ${userName}, ${action}, ${details})
         RETURNING *;
       `;

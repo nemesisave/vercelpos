@@ -21,10 +21,8 @@ export default async function handler(
             return res.status(400).json({ error: 'No update fields provided' });
         }
         
-        await sql`BEGIN`;
         const beforeStateResult = await sql`SELECT * FROM products WHERE id = ${id}`;
         if (beforeStateResult.rowCount === 0) {
-            await sql`ROLLBACK`;
             return res.status(404).json({ error: 'Product not found' });
         }
         const currentProduct = beforeStateResult.rows[0];
@@ -53,39 +51,22 @@ export default async function handler(
         `;
         const updatedProduct = updatedProductResult.rows[0];
         
-        await sql`
-            INSERT INTO audit_log (action, entity, entity_id, before_state, after_state)
-            VALUES ('UPDATE', 'product', ${id}, ${JSON.stringify(beforeStateResult.rows[0])}, ${JSON.stringify(updatedProduct)});
-        `;
-        await sql`COMMIT`;
-        
         return res.status(200).json(updatedProduct);
 
     } else if (req.method === 'DELETE') {
-        await sql`BEGIN`;
         const beforeStateResult = await sql`SELECT * FROM products WHERE id = ${id}`;
         if (beforeStateResult.rowCount === 0) {
-            await sql`ROLLBACK`;
             return res.status(404).json({ error: 'Product not found' });
         }
 
         await sql`DELETE FROM products WHERE id = ${id}`;
         
-        await sql`
-            INSERT INTO audit_log (action, entity, entity_id, before_state)
-            VALUES ('DELETE', 'product', ${id}, ${JSON.stringify(beforeStateResult.rows[0])});
-        `;
-        await sql`COMMIT`;
-
         return res.status(200).json({ success: true });
     } else {
         res.setHeader('Allow', ['PUT', 'DELETE']);
         return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
   } catch (error) {
-    // We might not have an active transaction if the error is early, so check before rollback.
-    // A more robust solution might inspect the error type.
-    try { await sql`ROLLBACK`; } catch (e) { /* ignore rollback errors */ }
     console.error(`Error processing product ${id}:`, error);
     return res.status(500).json({ error: (error as Error).message });
   }
