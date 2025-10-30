@@ -254,10 +254,15 @@ export async function ensureDbInitialized() {
         }
     }
 
-    // Idempotently add unique constraints to prevent errors on repeated initializations
-    await sql`ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS users_username_key UNIQUE (username);`;
-    await sql`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS products_name_key UNIQUE (name);`;
-    await sql`ALTER TABLE suppliers ADD CONSTRAINT IF NOT EXISTS suppliers_name_key UNIQUE (name);`;
+    // Idempotently add unique constraints by dropping and re-adding them to avoid syntax errors.
+    await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;`;
+    await sql`ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);`;
+
+    await sql`ALTER TABLE products DROP CONSTRAINT IF EXISTS products_name_key;`;
+    await sql`ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);`;
+
+    await sql`ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;`;
+    await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
     
     await seedInitialData();
     isDbInitialized = true;
