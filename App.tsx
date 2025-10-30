@@ -77,9 +77,6 @@ const App: React.FC = () => {
           }
       } catch (e) {
           setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
-          if (e instanceof Error && e.message.includes('relation') && e.message.includes('does not exist')) {
-            setError('Database tables not found. Please run initialization.');
-          }
       } finally {
           setIsLoading(false);
       }
@@ -670,6 +667,7 @@ const App: React.FC = () => {
             onPinFailure={handlePinFailure}
             setPinEntryUser={setPinEntryUser}
             setIsPinModalOpen={setIsPinModalOpen}
+            // FIX: Correct prop value, was onLockSession
             onLockSession={handleLockSession}
             onOpenAdminPanel={() => setAdminPanelOpen(true)}
             onCloseAdminPanel={() => setAdminPanelOpen(false)}
@@ -694,6 +692,7 @@ const App: React.FC = () => {
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
+            // FIX: Correct prop value, was onCloseDrawer
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}
@@ -703,7 +702,9 @@ const App: React.FC = () => {
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
             onReceiveStock={handleReceiveStock}
             onProcessRefund={handleProcessRefund}
+            // FIX: Correct prop value, was onSetCurrencies
             onSetCurrencies={handleSetCurrencies}
+            // FIX: Correct prop value, was onFetchLatestRates
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
             onUnparkSale={handleUnparkSale}

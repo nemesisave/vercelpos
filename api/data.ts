@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { InitialData } from '../types.js';
-import { sql, schemaSql, seedInitialData } from './_db.js';
+import { sql, ensureDbInitialized } from './_db.js';
 
 export default async function handler(
   request: VercelRequest,
@@ -11,26 +11,8 @@ export default async function handler(
   }
 
   try {
-    // Check if business_settings table exists as a proxy for schema initialization
-    const tableCheck = await sql`
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE  table_schema = 'public'
-            AND    table_name   = 'business_settings'
-        );
-    `;
-
-    if (!tableCheck.rows[0].exists) {
-        console.log('Tables not found, initializing schema and seeding data...');
-        const statements = schemaSql.split(';').filter(s => s.trim());
-        for (const statement of statements) {
-            if (statement) {
-                // Use a client for multi-statement execution if needed, but direct execution should work for CREATE TABLE IF NOT EXISTS
-                 await sql.query(statement);
-            }
-        }
-        await seedInitialData();
-    }
+    // Ensure the database is initialized before fetching data
+    await ensureDbInitialized();
 
     const [
       products,

@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    name TEXT,
+    name TEXT UNIQUE,
     price JSONB,
     "purchasePrice" JSONB,
     "imageUrl" TEXT,
@@ -236,4 +236,29 @@ export async function seedInitialData() {
     for (const supplier of MOCK_SUPPLIERS) {
         await sql`INSERT INTO suppliers (name, "contactPerson", phone, email, address, notes) VALUES (${supplier.name}, ${supplier.contactPerson}, ${supplier.phone}, ${supplier.email}, ${supplier.address}, ${supplier.notes}) ON CONFLICT (id) DO NOTHING;`;
     }
+}
+
+let isDbInitialized = false;
+
+export async function ensureDbInitialized() {
+  if (isDbInitialized) {
+    return;
+  }
+
+  try {
+    console.log('Ensuring database is initialized...');
+    const statements = schemaSql.split(';').filter(s => s.trim());
+    for (const statement of statements) {
+        if (statement) {
+            await sql.query(statement);
+        }
+    }
+    await seedInitialData();
+    isDbInitialized = true;
+    console.log('Database initialization check complete.');
+  } catch (error) {
+    console.error('Error during database initialization:', error);
+    // Re-throw the error to be caught by the calling API route
+    throw error;
+  }
 }
