@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT,
     "roleId" TEXT REFERENCES roles(id),
-    username TEXT UNIQUE,
+    username TEXT,
     password TEXT,
     pin TEXT,
     "avatarUrl" TEXT,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    name TEXT UNIQUE,
+    name TEXT,
     price JSONB,
     "purchasePrice" JSONB,
     "imageUrl" TEXT,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS products (
 
 CREATE TABLE IF NOT EXISTS suppliers (
     id SERIAL PRIMARY KEY,
-    name TEXT UNIQUE,
+    name TEXT,
     "contactPerson" TEXT,
     phone TEXT,
     email TEXT,
@@ -253,6 +253,25 @@ export async function ensureDbInitialized() {
             await sql.query(statement);
         }
     }
+
+    // Idempotently add unique constraints to prevent errors on repeated initializations
+    const idempotentConstraints = `
+        ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;
+        ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);
+
+        ALTER TABLE products DROP CONSTRAINT IF EXISTS products_name_key;
+        ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);
+
+        ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;
+        ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);
+    `;
+    const constraintStatements = idempotentConstraints.split(';').filter(s => s.trim());
+    for (const statement of constraintStatements) {
+        if (statement) {
+            await sql.query(statement);
+        }
+    }
+    
     await seedInitialData();
     isDbInitialized = true;
     console.log('Database initialization check complete.');
