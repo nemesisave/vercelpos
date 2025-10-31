@@ -193,9 +193,12 @@ const App: React.FC = () => {
       return;
     }
     try {
+        const userToDelete = users.find(u => u.id === userId);
         await api.deleteUser(userId, { adminUserId: currentUser.id, adminUserName: currentUser.name });
         setUsers(prev => prev.filter(u => u.id !== userId));
-        addAuditLog('DELETE_USER', `Deleted user ID: ${userId}`);
+        // Audit log is now handled by the API, but we can add a more detailed one here if needed.
+        // The API log is better as it's part of the transaction.
+        // Let's rely on the API for the audit log.
     } catch (error) {
         alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

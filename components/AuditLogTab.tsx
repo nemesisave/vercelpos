@@ -16,7 +16,7 @@ const AuditLogTab: React.FC<AuditLogTabProps> = ({ auditLogs, users }) => {
     let logs = [...auditLogs];
 
     if (userFilter !== 'all') {
-      logs = logs.filter(log => log.userId === parseInt(userFilter));
+      logs = logs.filter(log => log.user_id === parseInt(userFilter));
     }
 
     if (dateFilter !== 'all') {
@@ -24,7 +24,7 @@ const AuditLogTab: React.FC<AuditLogTabProps> = ({ auditLogs, users }) => {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       
       logs = logs.filter(log => {
-        const logDate = new Date(log.timestamp);
+        const logDate = new Date(log.created_at);
         switch(dateFilter) {
           case 'today':
             return logDate >= today;
@@ -87,8 +87,8 @@ const AuditLogTab: React.FC<AuditLogTabProps> = ({ auditLogs, users }) => {
                 <tbody className="bg-white divide-y divide-gray-200">
                     {filteredLogs.map(log => (
                         <tr key={log.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.timestamp).toLocaleString()}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{log.userName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{log.user_name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{log.action}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-sm" title={log.details}>{log.details}</td>
                         </tr>

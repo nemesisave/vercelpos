@@ -217,9 +217,9 @@ export interface PurchaseOrder {
 
 export interface AuditLog {
     id: number;
-    timestamp: string;
-    userId: number;
-    userName: string;
+    created_at: string;
+    user_id: number;
+    user_name: string;
     action: string;
     details: string;
 }

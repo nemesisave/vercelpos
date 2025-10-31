@@ -45,6 +45,7 @@ interface InventoryPanelProps {
   onAddUser: (newUserData: NewUserPayload) => void;
   onUpdateUser: (userId: number, updates: UserUpdatePayload) => void;
   onUpdateUserStatus: (userId: number, status: 'active' | 'inactive') => void;
+  onDeleteUser: (userId: number) => void;
   onAddRole: (newRole: Omit<Role, 'descriptionKey'>) => void;
   onUpdateRolePermissions: (roleId: string, permissions: Permission[]) => void;
   onUpdateBusinessSettings: (settings: BusinessSettings) => void;
@@ -394,7 +395,7 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
 
 const InventoryPanel: React.FC<InventoryPanelProps> = ({ 
     isOpen, onClose, products, user, onUpdateProduct, onDeleteProduct, onAddProduct, 
-    users, roles, onAddUser, onUpdateUser, onUpdateUserStatus, onAddRole, onUpdateRolePermissions,
+    users, roles, onAddUser, onUpdateUser, onUpdateUserStatus, onDeleteUser, onAddRole, onUpdateRolePermissions,
     suppliers, onAddSupplier, onUpdateSupplier, onDeleteSupplier,
     customers, onAddCustomer, onUpdateCustomer, onDeleteCustomer,
     purchaseOrders, onCreatePurchaseOrder, onReceiveStock,
@@ -521,6 +522,7 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
   const [isEditUserModalOpen, setEditUserModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [isAddRoleModalOpen, setAddRoleModalOpen] = useState(false);
@@ -850,8 +852,11 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
                                     </div>
                                     <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
                                         <button onClick={() => openEditUserModal(u)} className="text-sm font-medium text-blue-600 hover:text-blue-900">{t('adminPanel.users.edit')}</button>
-                                        <button onClick={() => openDeactivateConfirmModal(u)} disabled={user.id === u.id} className="text-sm font-medium text-red-600 hover:text-red-900 disabled:text-gray-300 disabled:cursor-not-allowed">
+                                        <button onClick={() => openDeactivateConfirmModal(u)} disabled={user.id === u.id} className="text-sm font-medium text-yellow-600 hover:text-yellow-900 disabled:text-gray-300 disabled:cursor-not-allowed">
                                             {u.status === 'active' ? t('adminPanel.users.deactivate') : t('adminPanel.users.activate')}
+                                        </button>
+                                        <button onClick={() => setUserToDelete(u)} disabled={user.id === u.id} className="text-sm font-medium text-red-600 hover:text-red-900 disabled:text-gray-300 disabled:cursor-not-allowed">
+                                            {t('adminPanel.users.delete')}
                                         </button>
                                     </div>
                                 </div>
@@ -1163,6 +1168,24 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
             </p>
         }
         confirmText={t('adminPanel.inventory.delete')}
+      />
+      <ConfirmationModal
+        isOpen={!!userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={() => {
+            if (userToDelete) {
+                onDeleteUser(userToDelete.id);
+                setUserToDelete(null);
+            }
+        }}
+        title={t('adminPanel.users.confirmDeleteTitle')}
+        message={
+            <p>
+                {t('adminPanel.users.confirmDeleteMessage')}{' '}
+                <strong className="text-text-primary">{userToDelete?.name}</strong>?
+            </p>
+        }
+        confirmText={t('adminPanel.users.delete')}
       />
     </>
   );
