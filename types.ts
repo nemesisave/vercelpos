@@ -70,7 +70,7 @@ export interface User {
   name:string;
   roleId: string;
   username: string;
-  password: string;
+  password?: string;
   pin: string;
   avatarUrl: string;
   status: 'active' | 'inactive';
@@ -84,8 +84,6 @@ export interface NewUserPayload {
   password: string;
   pin: string;
   roleId: string;
-  creatorId: number;
-  creatorName: string;
 }
 
 export interface UserUpdatePayload {

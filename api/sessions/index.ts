@@ -1,6 +1,19 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized } from '../_db.js';
+import { ensureDbInitialized, sql } from '../_db.js';
 import { db } from '@vercel/postgres';
+import { User } from '../../types.js';
+
+// Helper to get user from session
+async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) return null;
+    const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
+    if (sessionResult.rowCount === 0) return null;
+    const userId = sessionResult.rows[0].user_id;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
+    if (userResult.rowCount === 0) return null;
+    return userResult.rows[0] as User;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureDbInitialized();
@@ -9,14 +22,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
   
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    const { startingCash, openedBy, openedAt, userId } = req.body as {
+    const { startingCash, openedAt } = req.body as {
       startingCash: number;
-      openedBy: string;
       openedAt: string;
-      userId: number;
     };
     
     // Check for an existing open session
@@ -30,14 +46,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `INSERT INTO session_history ("isOpen", "startingCash", "openedBy", "openedAt", activities)
        VALUES (true, $1, $2, $3, '[]')
        RETURNING *;`,
-      [startingCash, openedBy, openedAt]
+      [startingCash, user.name, openedAt]
     );
     const newSession = result.rows[0];
 
     await client.query(
       `INSERT INTO audit_logs (user_id, user_name, action, details)
        VALUES ($1, $2, 'OPEN_CASH_DRAWER', $3);`,
-       [userId, openedBy, `Opened session #${newSession.id} with starting cash of ${startingCash}`]
+       [user.id, user.name, `Opened session #${newSession.id} with starting cash of ${startingCash}`]
     );
     
     await client.query('COMMIT');

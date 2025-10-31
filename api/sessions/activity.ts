@@ -1,7 +1,19 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized } from '../_db.js';
-import { CashDrawerActivity } from '../../types.js';
+import { ensureDbInitialized, sql } from '../_db.js';
+import { CashDrawerActivity, User } from '../../types.js';
 import { db } from '@vercel/postgres';
+
+// Helper to get user from session
+async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) return null;
+    const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
+    if (sessionResult.rowCount === 0) return null;
+    const userId = sessionResult.rows[0].user_id;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
+    if (userResult.rowCount === 0) return null;
+    return userResult.rows[0] as User;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureDbInitialized();
@@ -9,15 +21,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
+  
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    const { sessionId, activity, userId, userName } = req.body as {
+    const { sessionId, activity } = req.body as {
       sessionId: number;
       activity: CashDrawerActivity;
-      userId: number;
-      userName: string;
     };
 
     const result = await client.query(
@@ -36,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await client.query(
       `INSERT INTO audit_logs (user_id, user_name, action, details)
        VALUES ($1, $2, 'CASH_DRAWER_ACTIVITY', $3);`,
-      [userId, userName, `Activity: ${activity.type}, Amount: ${activity.amount}, Notes: ${activity.notes || activity.orderId || 'N/A'}`]
+      [user.id, user.name, `Activity: ${activity.type}, Amount: ${activity.amount}, Notes: ${activity.notes || activity.orderId || 'N/A'}`]
     );
 
     await client.query('COMMIT');

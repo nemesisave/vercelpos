@@ -41,6 +41,7 @@ interface AppContentProps {
     isDrawerModalOpen: boolean;
     isPinModalOpen: boolean;
     pinEntryUser: User | null;
+    pinError: string;
     discount: number;
     tip: number;
     selectedCustomerForOrder: Customer | null;
@@ -49,10 +50,10 @@ interface AppContentProps {
     onSetCustomerForOrder: (customer: Customer | null) => void;
     setDiscount: (discount: number) => void;
     setTip: (tip: number) => void;
-    onPinSuccess: (user: User) => void;
-    onPinFailure: (username: string) => string;
+    onPinSubmit: (password: string) => void;
     setPinEntryUser: (user: User | null) => void;
     setIsPinModalOpen: (isOpen: boolean) => void;
+    setPinError: (error: string) => void;
     onLockSession: () => void;
     onOpenAdminPanel: () => void;
     onCloseAdminPanel: () => void;
@@ -73,6 +74,7 @@ interface AppContentProps {
     onAddUser: (newUserData: NewUserPayload) => void;
     onUpdateUser: (userId: number, updates: UserUpdatePayload) => void;
     onUpdateUserStatus: (userId: number, status: 'active' | 'inactive') => void;
+    onDeleteUser: (userId: number) => void;
     onAddRole: (newRole: Omit<Role, 'descriptionKey'>) => void;
     onUpdateRolePermissions: (roleId: string, permissions: Permission[]) => void;
     onUpdateBusinessSettings: (settings: BusinessSettings) => void;
@@ -101,11 +103,11 @@ const AppContent: React.FC<AppContentProps> = ({
     isCheckoutModalOpen, isAdminPanelOpen, completedOrders, refundTransactions,
     viewingReceipt, businessSettings, currentSession, sessionHistory, currencies,
     auditLogs, isOrderSummaryOpen, productToWeigh, isDrawerModalOpen, isPinModalOpen,
-    pinEntryUser, onPinSuccess, onPinFailure, setPinEntryUser, setIsPinModalOpen, onLockSession, 
+    pinEntryUser, pinError, onPinSubmit, setPinEntryUser, setIsPinModalOpen, setPinError, onLockSession, 
     onOpenAdminPanel, onCloseAdminPanel, addToOrder, updateQuantity, removeFromOrder, 
     clearOrder, setCheckoutModalOpen, handlePaymentSuccess, setViewingReceipt, setProductToWeigh, 
     handleWeightEntered, handleOpenDrawer, setOrderSummaryOpen, onUpdateProduct, onDeleteProduct,
-    onAddProduct, onAddUser, onUpdateUser, onUpdateUserStatus, onAddRole, onUpdateRolePermissions,
+    onAddProduct, onAddUser, onUpdateUser, onUpdateUserStatus, onDeleteUser, onAddRole, onUpdateRolePermissions,
     onUpdateBusinessSettings, onViewReceipt, onCloseDrawer, onPayIn, onPayOut,
     onAddSupplier, onUpdateSupplier, onDeleteSupplier, onCreatePurchaseOrder, onReceiveStock,
     onProcessRefund, onSetCurrencies, onFetchLatestRates, onParkSale, onUnparkSale,
@@ -114,8 +116,7 @@ const AppContent: React.FC<AppContentProps> = ({
 }) => {
     const { formatCurrency } = useCurrency();
     const { t } = useTranslations();
-    const [pinError, setPinError] = useState('');
-
+    
     const orderTotal = useMemo(() => {
         if (!businessSettings) return 0;
         const baseCurrency = businessSettings.currency;
@@ -128,16 +129,6 @@ const AppContent: React.FC<AppContentProps> = ({
     const handleSelectUser = (user: User) => {
         setPinEntryUser(user);
         setIsPinModalOpen(true);
-    };
-
-    const handlePinSubmit = (password: string) => {
-        if (pinEntryUser && password === pinEntryUser.password) {
-            onPinSuccess(pinEntryUser);
-            setPinError('');
-        } else if (pinEntryUser) {
-            const errorMsg = onPinFailure(pinEntryUser.username);
-            setPinError(errorMsg);
-        }
     };
 
     const handleClosePinModal = () => {
@@ -153,7 +144,7 @@ const AppContent: React.FC<AppContentProps> = ({
                 <PinModal
                     user={pinEntryUser}
                     onClose={handleClosePinModal}
-                    onPinSubmit={handlePinSubmit}
+                    onPinSubmit={onPinSubmit}
                     error={pinError}
                 />
             </>
@@ -323,6 +314,7 @@ const AppContent: React.FC<AppContentProps> = ({
               onAddUser={onAddUser}
               onUpdateUser={onUpdateUser}
               onUpdateUserStatus={onUpdateUserStatus}
+              onDeleteUser={onDeleteUser}
               onAddRole={onAddRole}
               onUpdateRolePermissions={onUpdateRolePermissions}
               onUpdateBusinessSettings={onUpdateBusinessSettings}

@@ -12,6 +12,8 @@ if (!process.env.DATABASE_URL) {
 export const sql = vercelSql;
 
 export const schemaSql = `
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS business_settings (
     id SERIAL PRIMARY KEY,
     "businessName" TEXT,
@@ -60,8 +62,7 @@ CREATE TABLE IF NOT EXISTS users (
     "avatarUrl" TEXT,
     status TEXT,
     "lastLogin" TIMESTAMPTZ,
-    "deleted_at" TIMESTAMPTZ,
-    last_login TIMESTAMPTZ
+    "deleted_at" TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -180,6 +181,13 @@ CREATE TABLE IF NOT EXISTS inventory_count_items (
     counted_stock NUMERIC,
     difference NUMERIC
 );
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
+);
 `;
 
 const MOCK_ROLES = [
@@ -276,21 +284,6 @@ export async function ensureDbInitialized() {
 
     await sql`ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;`;
     await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
-
-    // Ensure users table has soft delete and last_login columns
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMPTZ;`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS "lastLogin" TIMESTAMPTZ;`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;`;
-    
-    // Ensure audit_logs table has the correct snake_case columns and new entity columns
-    await sql`ALTER TABLE audit_logs DROP COLUMN IF EXISTS timestamp;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INT;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name TEXT;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action TEXT;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_type TEXT;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;`;
     
     await seedInitialData();
     isDbInitialized = true;

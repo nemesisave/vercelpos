@@ -1,7 +1,19 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql, ensureDbInitialized } from '../_db.js';
-import { OrderItem, BusinessSettings, PaymentMethod, CompletedOrder } from '../../types.js';
+import { OrderItem, BusinessSettings, PaymentMethod, CompletedOrder, User } from '../../types.js';
 import { db } from '@vercel/postgres';
+
+// Helper to get user from session
+async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) return null;
+    const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
+    if (sessionResult.rowCount === 0) return null;
+    const userId = sessionResult.rows[0].user_id;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
+    if (userResult.rowCount === 0) return null;
+    return userResult.rows[0] as User;
+}
 
 export default async function handler(
   req: VercelRequest,
@@ -11,27 +23,28 @@ export default async function handler(
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }
+  
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const {
     orderItems,
     businessSettings,
-    cashierName,
     paymentMethod,
     tip,
     discount,
     customerId,
     customerName,
-    userId,
   } = req.body as {
     orderItems: OrderItem[],
     businessSettings: BusinessSettings,
-    cashierName: string,
     paymentMethod: PaymentMethod,
     tip: number,
     discount: number,
     customerId?: number | null,
     customerName?: string,
-    userId: number,
   };
 
   const client = await db.connect();
@@ -66,7 +79,7 @@ export default async function handler(
     // 3. Create completed order
     const newOrder: Omit<CompletedOrder, 'invoiceId'> = {
         date: new Date().toISOString(),
-        cashier: cashierName,
+        cashier: user.name,
         items: orderItems,
         subtotal, tax, tip, discount, total, paymentMethod,
         status: 'Completed',
@@ -87,7 +100,7 @@ export default async function handler(
     await client.query(
       `INSERT INTO audit_logs (user_id, user_name, action, details)
        VALUES ($1, $2, 'PROCESS_PAYMENT', $3);`,
-      [userId, cashierName, `Processed payment for order ${invoiceId}, Total: ${fullNewOrder.total}`]
+      [user.id, user.name, `Processed payment for order ${invoiceId}, Total: ${fullNewOrder.total}`]
     );
 
     await client.query('COMMIT');

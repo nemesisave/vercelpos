@@ -1,7 +1,19 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql, ensureDbInitialized } from '../_db.js';
-import { NewUserPayload } from '../../types.js';
+import { NewUserPayload, User } from '../../types.js';
 import { db } from '@vercel/postgres';
+
+// Helper to get user from session
+async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) return null;
+    const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
+    if (sessionResult.rowCount === 0) return null;
+    const userId = sessionResult.rows[0].user_id;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
+    if (userResult.rowCount === 0) return null;
+    return userResult.rows[0] as User;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureDbInitialized();
@@ -10,12 +22,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
+  const creator = await getAuthenticatedUser(req);
+  if (!creator) {
+      return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     
-    const { name, username, password, pin, roleId, creatorId, creatorName } = req.body as NewUserPayload;
-    if (!name || !username || !password || !pin || !roleId || !creatorId || !creatorName) {
+    const { name, username, password, pin, roleId } = req.body as NewUserPayload;
+    if (!name || !username || !password || !pin || !roleId ) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -25,12 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        RETURNING id, name, username, pin, "roleId", "avatarUrl", status, "lastLogin";`,
       [name, username, password, pin, roleId, `https://i.pravatar.cc/150?u=${username}`]
     );
-    const { password: _, ...newUser } = result.rows[0];
+    const newUser = result.rows[0];
+    delete newUser.password;
 
     await client.query(
       `INSERT INTO audit_logs (user_id, user_name, action, details)
        VALUES ($1, $2, 'CREATE_USER', $3);`,
-      [creatorId, creatorName, `Created new user: ${newUser.name} (@${newUser.username})`]
+      [creator.id, creator.name, `Created new user: ${newUser.name} (@${newUser.username})`]
     );
 
     await client.query('COMMIT');

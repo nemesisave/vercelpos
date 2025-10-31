@@ -33,19 +33,52 @@ import type { Currency } from '../currencies';
 // Helper to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+    let errorBody;
+    try {
+        errorBody = await response.json();
+    } catch (e) {
+        const errorText = await response.text().catch(() => 'Failed to get error text');
+        errorBody = { error: errorText || 'Failed to parse error response' };
+    }
     const errorMessage = errorBody.error || response.statusText;
     console.error('API Error:', errorMessage, errorBody);
-    throw new Error(`API request failed: ${errorMessage}`);
+    throw new Error(`${errorMessage}`);
   }
   return response.json() as Promise<T>;
 }
 
-// --- HEALTH & SETUP ---
+// --- AUTH & SETUP ---
 export const getInitialData = async (): Promise<InitialData> => {
   const response = await fetch('/api/data');
   return handleResponse<InitialData>(response);
 };
+
+export const getCurrentUser = async (): Promise<User> => {
+    const response = await fetch('/api/auth/me');
+    // Don't use handleResponse because 401 is an expected non-error case
+    if (response.status === 401) {
+        throw new Error('Not authenticated');
+    }
+    if (!response.ok) {
+        throw new Error('Failed to fetch current user');
+    }
+    return response.json();
+};
+
+export const login = async (username: string, password: string):Promise<User> => {
+    const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+    });
+    return handleResponse<User>(response);
+};
+
+export const logout = async (): Promise<{ success: boolean }> => {
+    const response = await fetch('/api/auth/logout', { method: 'POST' });
+    return handleResponse(response);
+}
+
 
 // --- PRODUCTS ---
 export const addProduct = async (productData: NewProductPayload): Promise<Product> => {
@@ -73,7 +106,7 @@ export const deleteProduct = async (productId: number): Promise<{ success: boole
 
 
 // --- USERS ---
-export const addUser = async (userData: NewUserPayload): Promise<User> => {
+export const addUser = async (userData: Omit<NewUserPayload, 'creatorId' | 'creatorName'>): Promise<User> => {
   const response = await fetch('/api/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -91,11 +124,10 @@ export const updateUser = async (userId: number, updates: UserUpdatePayload): Pr
   return handleResponse<User>(response);
 };
 
-export const deleteUser = async (userId: number, adminInfo: { adminUserId: number, adminUserName: string }): Promise<{ success: boolean }> => {
+export const deleteUser = async (userId: number): Promise<{ success: boolean }> => {
     const response = await fetch(`/api/users/${userId}`, { 
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(adminInfo)
     });
     return handleResponse<{ success: boolean }>(response);
 };
@@ -176,11 +208,11 @@ export const updateCurrencies = async (currencies: Currency[]): Promise<Currency
 
 
 // --- AUDIT LOG ---
-export const addAuditLog = async (userId: number, userName: string, action: string, details: string): Promise<AuditLog> => {
+export const addAuditLog = async (action: string, details: string): Promise<AuditLog> => {
    const response = await fetch('/api/audit-logs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, userName, action, details }),
+    body: JSON.stringify({ action, details }),
   });
   return handleResponse<AuditLog>(response);
 };
@@ -190,13 +222,11 @@ export const addAuditLog = async (userId: number, userName: string, action: stri
 export const processPayment = async (
     orderItems: OrderItem[],
     businessSettings: BusinessSettings,
-    cashierName: string,
     paymentMethod: PaymentMethod,
     tip: number,
     discount: number,
     customerId: number | null | undefined,
     customerName: string | undefined,
-    userId: number,
 ): Promise<{ updatedProducts: {id: number, stock: number}[], newOrder: CompletedOrder }> => {
     const response = await fetch('/api/orders/payment', {
         method: 'POST',
@@ -204,24 +234,22 @@ export const processPayment = async (
         body: JSON.stringify({ 
             orderItems, 
             businessSettings, 
-            cashierName, 
             paymentMethod,
             tip,
             discount,
             customerId,
             customerName,
-            userId,
         }),
     });
     return handleResponse<{ updatedProducts: {id: number, stock: number}[], newOrder: CompletedOrder }>(response);
 };
 
 
-export const processRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean, userId: number): Promise<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }> => {
+export const processRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean): Promise<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }> => {
   const response = await fetch(`/api/orders/refund`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ originalInvoiceId, itemsToRefund, restock, userId }),
+    body: JSON.stringify({ originalInvoiceId, itemsToRefund, restock }),
   });
   return handleResponse<{ updatedOrder: CompletedOrder, newRefund: RefundTransaction, updatedProducts?: {id: number, stock: number}[] }>(response);
 };
@@ -267,7 +295,7 @@ export const deleteSupplier = async (supplierId: number): Promise<{ success: boo
 
 
 // --- PURCHASE ORDERS ---
-export const createPurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; userId: number; userName: string; }): Promise<PurchaseOrder> => {
+export const createPurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }): Promise<PurchaseOrder> => {
   const response = await fetch('/api/purchase-orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -292,7 +320,7 @@ export const fetchLatestCurrencyRates = async (): Promise<{ currencies: Currency
 };
 
 // --- CASH DRAWER SESSIONS ---
-export const openSession = async (sessionData: { startingCash: number; openedBy: string; openedAt: string; userId: number; }): Promise<CashDrawerSession> => {
+export const openSession = async (sessionData: { startingCash: number; openedAt: string; }): Promise<CashDrawerSession> => {
   const response = await fetch('/api/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -301,16 +329,16 @@ export const openSession = async (sessionData: { startingCash: number; openedBy:
   return handleResponse<CashDrawerSession>(response);
 };
 
-export const addSessionActivity = async (sessionId: number, activity: CashDrawerActivity, userId: number, userName: string): Promise<CashDrawerSession> => {
+export const addSessionActivity = async (sessionId: number, activity: CashDrawerActivity): Promise<CashDrawerSession> => {
     const response = await fetch(`/api/sessions/activity`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, activity, userId, userName }),
+        body: JSON.stringify({ sessionId, activity }),
     });
     return handleResponse<CashDrawerSession>(response);
 };
 
-export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedBy: string; closedAt: string; userId: number; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
+export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedAt: string; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
     const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -321,8 +349,6 @@ export const closeSession = async (sessionId: number, closingData: { countedCash
 
 // --- INVENTORY COUNT ---
 export const saveInventoryCount = async (countData: {
-    userId: number;
-    userName: string;
     counts: { productId: number; counted: number }[];
 }): Promise<{ updatedProducts: Product[] }> => {
     const response = await fetch('/api/inventory/count', {

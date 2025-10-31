@@ -11,7 +11,7 @@ import * as api from './services/apiService';
 const MAX_LOGIN_ATTEMPTS = 5;
 
 const App: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [productToWeigh, setProductToWeigh] = useState<Product | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinEntryUser, setPinEntryUser] = useState<User | null>(null);
+  const [pinError, setPinError] = useState('');
   const [discount, setDiscount] = useState(0);
   const [tip, setTip] = useState(0);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState<Customer | null>(null);
@@ -48,11 +49,14 @@ const App: React.FC = () => {
   const [theme, setThemeState] = useState<ThemeName>('default');
   const [language, setLanguageState] = useState<'en' | 'es'>('es');
 
-
   const loadInitialData = async () => {
-      setIsLoading(true);
+      setIsInitialLoad(true);
       setError(null);
       try {
+          // Check for authenticated user first
+          const user = await api.getCurrentUser().catch(() => null);
+          setCurrentUser(user);
+
           const data = await api.getInitialData();
           setProducts(data.products || []);
           setUsers(data.users || []);
@@ -78,7 +82,7 @@ const App: React.FC = () => {
       } catch (e) {
           setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
       } finally {
-          setIsLoading(false);
+          setIsInitialLoad(false);
       }
   };
 
@@ -106,21 +110,20 @@ const App: React.FC = () => {
       }
   };
 
-  const addAuditLog = useCallback(async (action: string, details: string, user: User | null = currentUser) => {
-    if (!user) return;
+  const addAuditLog = useCallback(async (action: string, details: string) => {
     try {
-        const newLog = await api.addAuditLog(user.id, user.name, action, details);
+        const newLog = await api.addAuditLog(action, details);
         setAuditLogs(prev => [newLog, ...prev]);
     } catch (error) {
         console.error("Failed to add audit log:", error);
     }
-  }, [currentUser]);
+  }, []);
 
   const handleUpdateBusinessSettings = async (newSettings: BusinessSettings) => {
     try {
         const updatedSettings = await api.updateBusinessSettings(newSettings);
         setBusinessSettings(updatedSettings);
-        addAuditLog('UPDATE_SETTINGS', 'Business settings updated.');
+        // Audit log now handled by backend
     } catch (error) {
         alert(`Failed to update business settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -130,44 +133,37 @@ const App: React.FC = () => {
     try {
         const updatedProduct = await api.updateProduct(productId, updates);
         setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
-        addAuditLog('UPDATE_PRODUCT', `Updated product: ${updatedProduct.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [addAuditLog]);
+  }, []);
   
   const handleDeleteProduct = useCallback(async (productId: number) => {
     try {
         await api.deleteProduct(productId);
-        const deletedProductName = products.find(p => p.id === productId)?.name || `ID ${productId}`;
         setProducts(prev => prev.filter(p => p.id !== productId));
-        addAuditLog('DELETE_PRODUCT', `Deleted product: ${deletedProductName}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [addAuditLog, products]);
+  }, []);
 
   const handleAddNewProduct = useCallback(async (newProductData: NewProductPayload) => {
     try {
         const newProduct = await api.addProduct(newProductData);
         setProducts(prev => [newProduct, ...prev]);
-        addAuditLog('ADD_PRODUCT', `Added new product: ${newProduct.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to add new product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [addAuditLog]);
+  }, []);
 
-  const handleAddNewUser = async (newUserData: Omit<NewUserPayload, 'creatorId' | 'creatorName'>) => {
-    if (!currentUser) return;
+  const handleAddNewUser = async (newUserData: NewUserPayload) => {
     try {
-        const payload: NewUserPayload = {
-            ...newUserData,
-            creatorId: currentUser.id,
-            creatorName: currentUser.name,
-        };
-        const newUser = await api.addUser(payload);
+        const newUser = await api.addUser(newUserData);
         setUsers(prev => [...prev, newUser]);
-        addAuditLog('ADD_USER', `Added new user: ${newUser.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to add new user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -180,25 +176,21 @@ const App: React.FC = () => {
         if (currentUser?.id === userId) {
             setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
         }
-        addAuditLog('UPDATE_USER', `Updated user: ${updatedUser.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleDeleteUser = async (userId: number) => {
-    if (!currentUser) return;
-    if (currentUser.id === userId) {
+    if (currentUser?.id === userId) {
       alert("You cannot delete your own account.");
       return;
     }
     try {
-        const userToDelete = users.find(u => u.id === userId);
-        await api.deleteUser(userId, { adminUserId: currentUser.id, adminUserName: currentUser.name });
+        await api.deleteUser(userId);
         setUsers(prev => prev.filter(u => u.id !== userId));
-        // Audit log is now handled by the API, but we can add a more detailed one here if needed.
-        // The API log is better as it's part of the transaction.
-        // Let's rely on the API for the audit log.
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -245,7 +237,7 @@ const App: React.FC = () => {
      try {
         const newRole = await api.addRole(newRoleData);
         setRoles(prev => [...prev, newRole]);
-        addAuditLog('ADD_ROLE', `Added new role: ${newRole.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to add role: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -255,7 +247,7 @@ const App: React.FC = () => {
     try {
         const updatedRole = await api.updateRolePermissions(roleId, permissions);
         setRoles(prev => prev.map(r => r.id === roleId ? updatedRole : r));
-        addAuditLog('UPDATE_ROLE_PERMISSIONS', `Updated permissions for role: ${updatedRole.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to update role permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -265,7 +257,7 @@ const App: React.FC = () => {
     try {
         const newSupplier = await api.addSupplier(newSupplierData);
         setSuppliers(prev => [...prev, newSupplier]);
-        addAuditLog('ADD_SUPPLIER', `Added new supplier: ${newSupplier.name}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to add supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -275,7 +267,7 @@ const App: React.FC = () => {
     try {
         const updatedSupplier = await api.updateSupplier(supplierId, updates);
         setSuppliers(prev => prev.map(s => s.id === supplierId ? updatedSupplier : s));
-        addAuditLog('UPDATE_SUPPLIER', `Updated supplier: ${updatedSupplier.name}`);
+        // Audit log handled by backend
     } catch (error) {
          alert(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -284,10 +276,9 @@ const App: React.FC = () => {
   const handleDeleteSupplier = async (supplierId: number) => {
     if(confirm(t('app.deleteSupplierConfirm'))) {
         try {
-            const supplierName = suppliers.find(s => s.id === supplierId)?.name || `ID ${supplierId}`;
             await api.deleteSupplier(supplierId);
             setSuppliers(prev => prev.filter(s => s.id !== supplierId));
-            addAuditLog('DELETE_SUPPLIER', `Deleted supplier: ${supplierName}`);
+            // Audit log handled by backend
         } catch(error) {
             alert(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -295,15 +286,10 @@ const App: React.FC = () => {
   };
 
   const handleCreatePurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }) => {
-    if (!currentUser) return;
     try {
-        const newPO = await api.createPurchaseOrder({
-          ...orderData,
-          userId: currentUser.id,
-          userName: currentUser.name,
-        });
+        const newPO = await api.createPurchaseOrder(orderData);
         setPurchaseOrders(prev => [newPO, ...prev]);
-        addAuditLog('CREATE_PO', `Created Purchase Order ${newPO.id} for ${newPO.supplierName}`);
+        // Audit log handled by backend
     } catch (error) {
          alert(`Failed to create purchase order: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -321,16 +307,15 @@ const App: React.FC = () => {
             });
             return newProducts;
         });
-        addAuditLog('RECEIVE_STOCK', `Received stock for PO ${purchaseOrderId}`);
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to receive stock: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleProcessRefund = async (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean) => {
-    if (!currentUser) return;
     try {
-        const { updatedOrder, newRefund, updatedProducts } = await api.processRefund(originalInvoiceId, itemsToRefund, restock, currentUser.id);
+        const { updatedOrder, newRefund, updatedProducts } = await api.processRefund(originalInvoiceId, itemsToRefund, restock);
         setRefundTransactions(prev => [newRefund, ...prev]);
         setCompletedOrders(prev => prev.map(o => o.invoiceId === originalInvoiceId ? updatedOrder : o));
         if (updatedProducts) {
@@ -343,6 +328,7 @@ const App: React.FC = () => {
                 return newProducts;
             });
         }
+        // Audit log handled by backend
     } catch (error) {
         alert(`Failed to process refund: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -496,12 +482,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handlePinSubmit = async (password: string) => {
+    if (!pinEntryUser) return;
+    try {
+      const user = await api.login(pinEntryUser.username, password);
+      handlePinSuccess(user);
+    } catch (error) {
+      const errorMsg = handlePinFailure(pinEntryUser.username);
+      setPinError(errorMsg);
+    }
+  };
 
   const handlePinSuccess = (user: User) => {
     const lastLogin = new Date().toISOString();
     setCurrentUser({ ...user, lastLogin });
     setIsPinModalOpen(false);
     setPinEntryUser(null);
+    setPinError('');
     
     const openSession = sessionHistory.find(s => s.isOpen);
     setCurrentSession(openSession || null);
@@ -509,7 +506,7 @@ const App: React.FC = () => {
     if (!openSession) {
       setDrawerModalOpen(true);
     }
-    handleUpdateUser(user.id, { lastLogin });
+    handleUpdateUser(user.id, { lastLogin }); // This is now just a frontend state update and a call to the backend
     setFailedLoginAttempts(prev => {
         const newAttempts = { ...prev };
         delete newAttempts[user.username];
@@ -529,21 +526,19 @@ const App: React.FC = () => {
     return t('login.error');
   };
 
-  const handleLockSession = () => {
+  const handleLockSession = async () => {
+    await api.logout();
     setCurrentUser(null);
     clearOrder();
   };
   
   const handleOpenDrawer = async (startingCash: number) => {
-    const user = pinEntryUser || currentUser;
-    if (!user) return;
+    if (!currentUser) return;
 
     try {
         const newSession = await api.openSession({
             startingCash,
-            openedBy: user.name,
             openedAt: new Date().toISOString(),
-            userId: user.id
         });
         setCurrentSession(newSession);
         setDrawerModalOpen(false);
@@ -557,9 +552,7 @@ const App: React.FC = () => {
     try {
         const { session: closedSession, message } = await api.closeSession(currentSession.id, {
             countedCash,
-            closedBy: currentUser.name,
             closedAt: new Date().toISOString(),
-            userId: currentUser.id
         });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
         setCurrentSession(null);
@@ -576,7 +569,7 @@ const App: React.FC = () => {
         timestamp: new Date().toISOString(),
     };
     try {
-        const updatedSession = await api.addSessionActivity(currentSession.id, fullActivity, currentUser.id, currentUser.name);
+        const updatedSession = await api.addSessionActivity(currentSession.id, fullActivity);
         setCurrentSession(updatedSession);
         // Update history in case it's displayed
         setSessionHistory(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
@@ -600,13 +593,11 @@ const App: React.FC = () => {
         const { updatedProducts, newOrder } = await api.processPayment(
             orderItems,
             businessSettings,
-            currentUser.name,
             paymentMethod,
             tip,
             discount,
             selectedCustomerForOrder?.id,
             selectedCustomerForOrder?.name,
-            currentUser.id
         );
         
         setCompletedOrders(prev => [newOrder, ...prev]);
@@ -642,7 +633,7 @@ const App: React.FC = () => {
     setSelectCustomerModalOpen(false);
   };
 
-  if (isLoading) {
+  if (isInitialLoad) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
@@ -683,6 +674,7 @@ const App: React.FC = () => {
             isDrawerModalOpen={isDrawerModalOpen}
             isPinModalOpen={isPinModalOpen}
             pinEntryUser={pinEntryUser}
+            pinError={pinError}
             discount={discount}
             tip={tip}
             selectedCustomerForOrder={selectedCustomerForOrder}
@@ -691,11 +683,10 @@ const App: React.FC = () => {
             onSetCustomerForOrder={handleSetCustomerForOrder}
             setDiscount={setDiscount}
             setTip={setTip}
-            onPinSuccess={handlePinSuccess}
-            onPinFailure={handlePinFailure}
+            onPinSubmit={handlePinSubmit}
             setPinEntryUser={setPinEntryUser}
             setIsPinModalOpen={setIsPinModalOpen}
-            // FIX: Pass correct handler for locking session
+            setPinError={setPinError}
             onLockSession={handleLockSession}
             onOpenAdminPanel={() => setAdminPanelOpen(true)}
             onCloseAdminPanel={() => setAdminPanelOpen(false)}
@@ -712,7 +703,6 @@ const App: React.FC = () => {
             setOrderSummaryOpen={setOrderSummaryOpen}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
-            // FIX: Pass correct handler for adding a product
             onAddProduct={handleAddNewProduct}
             onAddUser={handleAddNewUser}
             onUpdateUser={handleUpdateUser}
@@ -723,26 +713,19 @@ const App: React.FC = () => {
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
             onCloseDrawer={handleCloseDrawer}
-            // FIX: Pass correct handler for pay in
             onPayIn={handlePayIn}
-            // FIX: Pass correct handler for pay out
             onPayOut={handlePayOut}
             onAddSupplier={handleAddSupplier}
-            // FIX: Pass correct handler for updating supplier
             onUpdateSupplier={handleUpdateSupplier}
-            // FIX: Pass correct handler for deleting supplier
             onDeleteSupplier={handleDeleteSupplier}
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
-            // FIX: Pass correct handler for receiving stock
             onReceiveStock={handleReceiveStock}
-            // FIX: Pass correct handler for processing refund
             onProcessRefund={handleProcessRefund}
             onSetCurrencies={handleSetCurrencies}
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
             onUnparkSale={handleUnparkSale}
             onAddCustomer={handleAddCustomer}
-            // FIX: Pass correct handler for updating customer
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}
           />

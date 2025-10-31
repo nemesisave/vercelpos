@@ -1,19 +1,35 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized } from '../_db.js';
+import { ensureDbInitialized, sql } from '../_db.js';
 import { CompletedOrder, OrderItem, RefundTransaction, User } from '../../types.js';
 import { db } from '@vercel/postgres';
+
+// Helper to get user from session
+async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
+    const sessionId = req.cookies.session_id;
+    if (!sessionId) return null;
+    const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
+    if (sessionResult.rowCount === 0) return null;
+    const userId = sessionResult.rows[0].user_id;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
+    if (userResult.rowCount === 0) return null;
+    return userResult.rows[0] as User;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureDbInitialized();
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }
+  
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  const { originalInvoiceId, itemsToRefund, restock, userId } = req.body as {
+  const { originalInvoiceId, itemsToRefund, restock } = req.body as {
     originalInvoiceId: string;
     itemsToRefund: { id: number; quantity: number }[];
     restock: boolean;
-    userId: number;
   };
 
   const client = await db.connect();
@@ -26,12 +42,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Original order not found');
     }
     const order: CompletedOrder = orderResult.rows[0] as any;
-
-    const userResult = await client.query('SELECT name FROM users WHERE id = $1', [userId]);
-    if (userResult.rows.length === 0) {
-      throw new Error('User not found');
-    }
-    const user = userResult.rows[0] as User;
 
     // 2. Calculate refund amount and create refund items
     let totalRefundAmount = 0;
@@ -48,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Adjust for tax proportionally
-    const refundProportionOfSubtotal = order.subtotal > 0 ? (totalRefundAmount / order.subtotal) : 0;
+    const refundProportionOfSubtotal = order.subtotal > 0 ? (totalRefundAmount / (order.subtotal - order.discount)) : 0;
     const taxRefund = order.tax * refundProportionOfSubtotal;
     totalRefundAmount = totalRefundAmount + taxRefund;
     
@@ -92,6 +102,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *;`,
       [refundId, newRefund.originalInvoiceId, newRefund.date, newRefund.cashier, JSON.stringify(newRefund.items), newRefund.totalRefundAmount, newRefund.stockRestored]
+    );
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, user_name, action, details)
+       VALUES ($1, $2, 'PROCESS_REFUND', $3);`,
+      [user.id, user.name, `Processed refund for order ${originalInvoiceId}, Amount: ${totalRefundAmount}`]
     );
 
     await client.query('COMMIT');
