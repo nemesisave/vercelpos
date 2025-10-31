@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Check for an existing open session
     const openSessionResult = await client.query('SELECT id FROM session_history WHERE "isOpen" = true');
-    if (openSessionResult && openSessionResult.rowCount > 0) {
+    if (openSessionResult && openSessionResult.rowCount != null && openSessionResult.rowCount > 0) {
       await client.query('ROLLBACK'); // No changes made, but good practice
       return res.status(409).json({ error: 'An open session already exists.' });
     }
