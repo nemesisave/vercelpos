@@ -247,7 +247,15 @@ export async function seedInitialData() {
     }
 
     for (const user of MOCK_USERS) {
-        await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status}) ON CONFLICT (username) DO UPDATE SET "deleted_at" = NULL, status = 'active';`;
+        // Check for user regardless of deleted status
+        const existing = await sql`SELECT id, deleted_at FROM users WHERE username = ${user.username} LIMIT 1`;
+        if (existing.rowCount > 0) {
+            // User exists, reactivate and update them
+            await sql`UPDATE users SET name = ${user.name}, "roleId" = ${user.roleId}, password = ${user.password}, pin = ${user.pin}, "avatarUrl" = ${user.avatarUrl}, status = ${user.status}, "deleted_at" = NULL WHERE id = ${existing.rows[0].id}`;
+        } else {
+            // User does not exist, insert
+            await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status})`;
+        }
     }
 
     for (const product of MOCK_PRODUCTS) {
@@ -279,7 +287,7 @@ export async function ensureDbInitialized() {
     // This allows reusing usernames of soft-deleted users.
     await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;`;
     await sql`DROP INDEX IF EXISTS users_username_unique_when_not_deleted;`;
-    await sql`CREATE UNIQUE INDEX users_username_unique_when_not_deleted ON users (username) WHERE "deleted_at" IS NULL;`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_when_not_deleted ON users (username) WHERE "deleted_at" IS NULL;`;
 
     await sql`ALTER TABLE products DROP CONSTRAINT IF EXISTS products_name_key;`;
     await sql`ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);`;
