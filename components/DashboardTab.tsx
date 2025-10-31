@@ -113,7 +113,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
 
 
   const stats = useMemo(() => {
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
     const totalSales = filteredOrders.length;
     const averageSaleValue = totalSales > 0 ? totalRevenue / totalSales : 0;
     
