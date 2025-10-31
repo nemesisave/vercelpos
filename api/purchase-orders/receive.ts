@@ -1,5 +1,4 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-// FIX: Module '"../_db.js"' has no exported member 'withTx'. Replaced with standard transaction client from '@vercel/postgres'.
 import { ensureDbInitialized } from '../_db.js';
 import { db } from '@vercel/postgres';
 import { PurchaseOrder, PurchaseOrderItem } from '../../types.js';

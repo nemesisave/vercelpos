@@ -166,6 +166,8 @@ export const es = {
       confirmActivateTitle: 'Activar Usuario',
       confirmActivateMessage: '¿Estás seguro de que quieres activar a',
       analyzeActivity: 'Analizar Actividad de Usuario con IA',
+      confirmDeleteTitle: 'Eliminar Usuario',
+      confirmDeleteMessage: '¿Estás seguro de que quieres eliminar permanentemente a',
     },
      customers: {
       title: 'Gestión de Clientes',

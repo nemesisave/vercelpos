@@ -166,6 +166,8 @@ export const en = {
       confirmActivateTitle: 'Activate User',
       confirmActivateMessage: 'Are you sure you want to activate',
       analyzeActivity: 'Analyze User Activity with AI',
+      confirmDeleteTitle: 'Delete User',
+      confirmDeleteMessage: 'Are you sure you want to permanently delete',
     },
      customers: {
       title: 'Customer Management',

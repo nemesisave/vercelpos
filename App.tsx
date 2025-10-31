@@ -292,7 +292,6 @@ const App: React.FC = () => {
   };
 
   const handleCreatePurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }) => {
-    // FIX: Add currentUser check and include userId and userName in the payload for createPurchaseOrder API call.
     if (!currentUser) return;
     try {
         const newPO = await api.createPurchaseOrder({
@@ -561,8 +560,7 @@ const App: React.FC = () => {
         });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
         setCurrentSession(null);
-        alert(t('app.drawerClosedAndLoggedOut'));
-        setCurrentUser(null);
+        alert(t('adminPanel.cashDrawer.closeSuccess'));
     } catch(e) {
         alert(`Failed to close cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
@@ -694,7 +692,6 @@ const App: React.FC = () => {
             onPinFailure={handlePinFailure}
             setPinEntryUser={setPinEntryUser}
             setIsPinModalOpen={setIsPinModalOpen}
-            // FIX: Correct prop value, was onLockSession
             onLockSession={handleLockSession}
             onOpenAdminPanel={() => setAdminPanelOpen(true)}
             onCloseAdminPanel={() => setAdminPanelOpen(false)}
@@ -720,7 +717,6 @@ const App: React.FC = () => {
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
-            // FIX: Correct prop value, was onCloseDrawer
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}
@@ -730,9 +726,7 @@ const App: React.FC = () => {
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
             onReceiveStock={handleReceiveStock}
             onProcessRefund={handleProcessRefund}
-            // FIX: Correct prop value, was onSetCurrencies
             onSetCurrencies={handleSetCurrencies}
-            // FIX: Correct prop value, was onFetchLatestRates
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
             onUnparkSale={handleUnparkSale}
