@@ -36,6 +36,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Check for existing active user with the same username
+    const existingUserCheck = await client.query(
+      `SELECT id FROM users WHERE username = $1 AND "deleted_at" IS NULL`,
+      [username]
+    );
+
+    if (existingUserCheck.rowCount > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+
     const result = await client.query(
       `INSERT INTO users (name, username, password, pin, "roleId", "avatarUrl", status)
        VALUES ($1, $2, $3, $4, $5, $6, 'active')
@@ -56,9 +67,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error adding user:', error);
-    if (error instanceof Error && (error as any).code === '23505' && (error as any).constraint === 'users_username_key') {
-      return res.status(409).json({ error: 'Username already exists' });
-    }
     res.status(500).json({ error: (error as Error).message });
   } finally {
     client.release();

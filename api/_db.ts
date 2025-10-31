@@ -247,7 +247,7 @@ export async function seedInitialData() {
     }
 
     for (const user of MOCK_USERS) {
-        await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status}) ON CONFLICT (username) DO NOTHING;`;
+        await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status}) ON CONFLICT (username) DO UPDATE SET "deleted_at" = NULL, status = 'active';`;
     }
 
     for (const product of MOCK_PRODUCTS) {
@@ -275,9 +275,11 @@ export async function ensureDbInitialized() {
         }
     }
 
-    // Idempotently add unique constraints by dropping and re-adding them to avoid syntax errors.
+    // Drop old unique constraint and create a partial unique index for usernames
+    // This allows reusing usernames of soft-deleted users.
     await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;`;
-    await sql`ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);`;
+    await sql`DROP INDEX IF EXISTS users_username_unique_when_not_deleted;`;
+    await sql`CREATE UNIQUE INDEX users_username_unique_when_not_deleted ON users (username) WHERE "deleted_at" IS NULL;`;
 
     await sql`ALTER TABLE products DROP CONSTRAINT IF EXISTS products_name_key;`;
     await sql`ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);`;

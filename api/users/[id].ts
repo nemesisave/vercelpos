@@ -75,7 +75,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json(updatedUser);
 
     } else if (req.method === 'DELETE') {
-        const result = await client.query('UPDATE users SET "deleted_at" = NOW() WHERE id = $1 RETURNING name', [id]);
+        // Invalidate all active sessions for this user
+        await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [id]);
+
+        // Soft delete the user
+        const result = await client.query('UPDATE users SET "deleted_at" = NOW(), status = \'inactive\' WHERE id = $1 RETURNING name', [id]);
         if (result.rowCount === 0) {
             throw new Error('User not found');
         }
