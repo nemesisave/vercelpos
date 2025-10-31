@@ -7,6 +7,33 @@ interface AuditLogTabProps {
   users: User[];
 }
 
+const ActionBadge: React.FC<{ action: string }> = ({ action }) => {
+  const { t } = useTranslations();
+  const translationKey = `auditLog.actions.${action}`;
+  const translatedAction = t(translationKey);
+  const displayText = translatedAction === translationKey ? action.replace(/_/g, ' ') : translatedAction;
+
+  let colorClasses = 'bg-gray-100 text-gray-800'; // Default
+  if (action.startsWith('ADD_') || action.startsWith('CREATE_') || action.startsWith('OPEN_')) {
+    colorClasses = 'bg-green-100 text-green-800';
+  } else if (action.startsWith('UPDATE_') || action.startsWith('RECEIVE_')) {
+    colorClasses = 'bg-blue-100 text-blue-800';
+  } else if (action.startsWith('DELETE_') || action.startsWith('CLOSE_')) {
+    colorClasses = 'bg-red-100 text-red-800';
+  } else if (action.includes('PAYMENT') || action.includes('REFUND')) {
+    colorClasses = 'bg-purple-100 text-purple-800';
+  } else if (action.includes('CASH')) {
+    colorClasses = 'bg-yellow-100 text-yellow-800';
+  }
+
+  return (
+    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${colorClasses}`}>
+      {displayText}
+    </span>
+  );
+};
+
+
 const AuditLogTab: React.FC<AuditLogTabProps> = ({ auditLogs, users }) => {
   const { t } = useTranslations();
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -89,7 +116,9 @@ const AuditLogTab: React.FC<AuditLogTabProps> = ({ auditLogs, users }) => {
                         <tr key={log.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{log.user_name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{log.action}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              <ActionBadge action={log.action} />
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-sm" title={log.details}>{log.details}</td>
                         </tr>
                     ))}
