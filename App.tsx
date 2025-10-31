@@ -292,8 +292,14 @@ const App: React.FC = () => {
   };
 
   const handleCreatePurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }) => {
+    // FIX: Add currentUser check and include userId and userName in the payload for createPurchaseOrder API call.
+    if (!currentUser) return;
     try {
-        const newPO = await api.createPurchaseOrder(orderData);
+        const newPO = await api.createPurchaseOrder({
+          ...orderData,
+          userId: currentUser.id,
+          userName: currentUser.name,
+        });
         setPurchaseOrders(prev => [newPO, ...prev]);
         addAuditLog('CREATE_PO', `Created Purchase Order ${newPO.id} for ${newPO.supplierName}`);
     } catch (error) {

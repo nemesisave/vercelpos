@@ -348,6 +348,7 @@ export const es = {
       viewReport: 'Ver Reporte',
       totalPayIns: 'Total de Entradas',
       totalPayOuts: 'Total de Salidas',
+      closeSuccess: 'La sesión de caja se cerró con éxito.',
     }
   },
   productModal: {

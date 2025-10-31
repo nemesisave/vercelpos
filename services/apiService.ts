@@ -267,7 +267,7 @@ export const deleteSupplier = async (supplierId: number): Promise<{ success: boo
 
 
 // --- PURCHASE ORDERS ---
-export const createPurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }): Promise<PurchaseOrder> => {
+export const createPurchaseOrder = async (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; userId: number; userName: string; }): Promise<PurchaseOrder> => {
   const response = await fetch('/api/purchase-orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

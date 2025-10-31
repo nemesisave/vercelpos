@@ -350,6 +350,7 @@ export const en = {
       viewReport: 'View Report',
       totalPayIns: 'Total Pay-Ins',
       totalPayOuts: 'Total Pay-Outs',
+      closeSuccess: 'Cash drawer session closed successfully.',
     }
   },
   productModal: {

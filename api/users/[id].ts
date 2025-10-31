@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         for (const [key, value] of Object.entries(updates)) {
             if (value !== undefined) {
-                const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                const dbKey = key; // Use the key directly (camelCase)
                 if (dbKey === 'password' && !value) continue;
                 
                 setClauses.push(`"${dbKey}" = $${valueCount++}`);
