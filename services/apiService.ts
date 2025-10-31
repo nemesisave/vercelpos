@@ -310,13 +310,13 @@ export const addSessionActivity = async (sessionId: number, activity: CashDrawer
     return handleResponse<CashDrawerSession>(response);
 };
 
-export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedBy: string; closedAt: string; userId: number; }): Promise<CashDrawerSession> => {
+export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedBy: string; closedAt: string; userId: number; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
     const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(closingData),
     });
-    return handleResponse<CashDrawerSession>(response);
+    return handleResponse<{ session: CashDrawerSession; message: string; success: boolean; }>(response);
 };
 
 // --- INVENTORY COUNT ---

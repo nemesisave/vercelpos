@@ -61,13 +61,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     await client.query('COMMIT');
-    res.status(200).json(closedSession);
+    res.status(200).json({ success: true, message: 'Cash drawer session closed successfully.', session: closedSession });
 
   } catch (error) {
     await client.query('ROLLBACK');
     console.error(`Error closing session ${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    res.status(500).json({ error: errorMessage });
+    if (errorMessage === 'Session not found') {
+        return res.status(404).json({ success: false, error: errorMessage });
+    }
+    res.status(500).json({ success: false, error: errorMessage });
   } finally {
     client.release();
   }

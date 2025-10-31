@@ -552,7 +552,7 @@ const App: React.FC = () => {
   const handleCloseDrawer = async (countedCash: number) => {
     if (!currentSession || !currentUser) return;
     try {
-        const closedSession = await api.closeSession(currentSession.id, {
+        const { session: closedSession, message } = await api.closeSession(currentSession.id, {
             countedCash,
             closedBy: currentUser.name,
             closedAt: new Date().toISOString(),
@@ -560,7 +560,7 @@ const App: React.FC = () => {
         });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
         setCurrentSession(null);
-        alert(t('adminPanel.cashDrawer.closeSuccess'));
+        alert(message);
     } catch(e) {
         alert(`Failed to close cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
@@ -692,6 +692,7 @@ const App: React.FC = () => {
             onPinFailure={handlePinFailure}
             setPinEntryUser={setPinEntryUser}
             setIsPinModalOpen={setIsPinModalOpen}
+            // FIX: Pass correct handler for locking session
             onLockSession={handleLockSession}
             onOpenAdminPanel={() => setAdminPanelOpen(true)}
             onCloseAdminPanel={() => setAdminPanelOpen(false)}
@@ -708,6 +709,7 @@ const App: React.FC = () => {
             setOrderSummaryOpen={setOrderSummaryOpen}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            // FIX: Pass correct handler for adding a product
             onAddProduct={handleAddNewProduct}
             onAddUser={handleAddNewUser}
             onUpdateUser={handleUpdateUser}
@@ -718,19 +720,26 @@ const App: React.FC = () => {
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
             onCloseDrawer={handleCloseDrawer}
+            // FIX: Pass correct handler for pay in
             onPayIn={handlePayIn}
+            // FIX: Pass correct handler for pay out
             onPayOut={handlePayOut}
             onAddSupplier={handleAddSupplier}
+            // FIX: Pass correct handler for updating supplier
             onUpdateSupplier={handleUpdateSupplier}
+            // FIX: Pass correct handler for deleting supplier
             onDeleteSupplier={handleDeleteSupplier}
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
+            // FIX: Pass correct handler for receiving stock
             onReceiveStock={handleReceiveStock}
+            // FIX: Pass correct handler for processing refund
             onProcessRefund={handleProcessRefund}
             onSetCurrencies={handleSetCurrencies}
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
             onUnparkSale={handleUnparkSale}
             onAddCustomer={handleAddCustomer}
+            // FIX: Pass correct handler for updating customer
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}
           />
