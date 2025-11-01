@@ -24,14 +24,14 @@ const ActivityIcon: React.FC<{ activity: CashDrawerActivity }> = ({ activity }) 
         'pay-in': 'text-green-500 bg-green-100',
         'pay-out': 'text-red-500 bg-red-100',
     }
-    const finalColor = activity.type === 'sale' && activity.paymentMethod === 'card' ? 'text-purple-500 bg-purple-100' : colorMap[activity.type];
+    const finalColor = activity.type === 'sale' && activity.payment_method === 'card' ? 'text-purple-500 bg-purple-100' : colorMap[activity.type];
     return <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${finalColor}`}>{iconMap[activity.type]}</div>
 };
 
 const ActivityLabel: React.FC<{ activity: CashDrawerActivity }> = ({ activity }) => {
     const { t } = useTranslations();
     if (activity.type === 'sale') {
-        return activity.paymentMethod === 'cash' ? <>{t('adminPanel.cashDrawer.activityCashSale')}</> : <>{t('adminPanel.cashDrawer.activityCardSale')}</>
+        return activity.payment_method === 'cash' ? <>{t('adminPanel.cashDrawer.activityCashSale')}</> : <>{t('adminPanel.cashDrawer.activityCardSale')}</>
     }
     return activity.type === 'pay-in' ? <>{t('adminPanel.cashDrawer.activityPayIn')}</> : <>{t('adminPanel.cashDrawer.activityPayOut')}</>
 };
@@ -48,24 +48,26 @@ const CashDrawerTab: React.FC<CashDrawerTabProps> = ({ currentSession, sessionHi
     const sessionSummary = useMemo(() => {
         if (!currentSession) return null;
         
-        const cashSales = currentSession.activities
-            .filter(a => a.type === 'sale' && a.paymentMethod === 'cash')
-            .reduce((sum, a) => sum + a.amount, 0);
+        const activities = currentSession.activities || [];
         
-        const cardSales = currentSession.activities
-            .filter(a => a.type === 'sale' && a.paymentMethod === 'card')
-            .reduce((sum, a) => sum + a.amount, 0);
+        const cashSales = activities
+            .filter(a => a.type === 'sale' && a.payment_method === 'cash')
+            .reduce((sum, a) => sum + Number(a.amount), 0);
         
-        const totalPayIns = currentSession.activities
+        const cardSales = activities
+            .filter(a => a.type === 'sale' && a.payment_method === 'card')
+            .reduce((sum, a) => sum + Number(a.amount), 0);
+        
+        const totalPayIns = activities
             .filter(a => a.type === 'pay-in')
-            .reduce((sum, a) => sum + a.amount, 0);
+            .reduce((sum, a) => sum + Number(a.amount), 0);
 
-        const totalPayOuts = currentSession.activities
+        const totalPayOuts = activities
             .filter(a => a.type === 'pay-out')
-            .reduce((sum, a) => sum + a.amount, 0);
+            .reduce((sum, a) => sum + Number(a.amount), 0);
 
         const totalSales = cashSales + cardSales;
-        const expectedInDrawer = currentSession.startingCash + cashSales + totalPayIns - totalPayOuts;
+        const expectedInDrawer = Number(currentSession.opening_amount) + cashSales + totalPayIns - totalPayOuts;
 
         return { cashSales, cardSales, totalSales, expectedInDrawer, totalPayIns, totalPayOuts };
     }, [currentSession]);
@@ -108,6 +110,8 @@ const CashDrawerTab: React.FC<CashDrawerTabProps> = ({ currentSession, sessionHi
                 </div>
             );
         }
+        
+        const activities = currentSession.activities || [];
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -121,9 +125,9 @@ const CashDrawerTab: React.FC<CashDrawerTabProps> = ({ currentSession, sessionHi
                                 <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">{t('adminPanel.cashDrawer.statusOpen')}</span>
                             </div>
                             <div className="space-y-2 text-sm">
-                                <p className="flex justify-between"><span>{t('adminPanel.cashDrawer.openedBy')}:</span> <span className="font-medium">{currentSession.openedBy}</span></p>
-                                <p className="flex justify-between"><span>{t('adminPanel.cashDrawer.startTime')}:</span> <span className="font-medium">{currentSession.openedAt}</span></p>
-                                <p className="flex justify-between border-t pt-2 mt-2"><span>{t('adminPanel.cashDrawer.startingCash')}:</span> <span className="font-bold text-base">{formatCurrency(currentSession.startingCash)}</span></p>
+                                <p className="flex justify-between"><span>{t('adminPanel.cashDrawer.openedBy')}:</span> <span className="font-medium">{currentSession.opened_by}</span></p>
+                                <p className="flex justify-between"><span>{t('adminPanel.cashDrawer.startTime')}:</span> <span className="font-medium">{new Date(currentSession.opened_at).toLocaleString()}</span></p>
+                                <p className="flex justify-between border-t pt-2 mt-2"><span>{t('adminPanel.cashDrawer.startingCash')}:</span> <span className="font-bold text-base">{formatCurrency(currentSession.opening_amount)}</span></p>
                             </div>
                         </div>
                     </div>
@@ -189,22 +193,22 @@ const CashDrawerTab: React.FC<CashDrawerTabProps> = ({ currentSession, sessionHi
                         </div>
                     </div>
                      <div className="bg-white p-4 rounded-lg shadow-sm border h-[calc(100%-2.5rem)] overflow-y-auto">
-                        {currentSession.activities.length > 0 ? (
+                        {activities.length > 0 ? (
                             <ul className="divide-y divide-gray-200">
-                                {[...currentSession.activities].reverse().map((activity, index) => (
-                                    <li key={index} className="py-3 flex items-center justify-between">
+                                {[...activities].reverse().map((activity) => (
+                                    <li key={activity.id} className="py-3 flex items-center justify-between">
                                         <div className="flex items-center">
                                             <ActivityIcon activity={activity} />
                                             <div>
                                                 <p className="font-semibold text-sm"><ActivityLabel activity={activity} /></p>
-                                                <p className="text-xs text-gray-500">{activity.notes || activity.orderId}</p>
+                                                <p className="text-xs text-gray-500">{activity.notes || activity.order_id}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <p className={`font-bold ${activity.type === 'pay-out' ? 'text-red-600' : 'text-gray-800'}`}>
-                                               {activity.type === 'pay-out' ? '-' : ''}{formatCurrency(activity.amount)}
+                                               {activity.type === 'pay-out' ? '-' : ''}{formatCurrency(Number(activity.amount))}
                                             </p>
-                                            <p className="text-xs text-gray-400">{activity.timestamp.split(',')[1]}</p>
+                                            <p className="text-xs text-gray-400">{new Date(activity.created_at).toLocaleTimeString()}</p>
                                         </div>
                                     </li>
                                 ))}
@@ -230,8 +234,8 @@ const CashDrawerTab: React.FC<CashDrawerTabProps> = ({ currentSession, sessionHi
                     <div key={session.id} className="p-4">
                         <div className="flex justify-between items-start">
                            <div>
-                             <p className="font-bold text-gray-700">{session.closedAt || session.openedAt}</p>
-                             <p className="text-sm text-gray-500">{t('adminPanel.cashDrawer.openedBy')}: {session.openedBy} / {t('adminPanel.cashDrawer.closedBy')}: {session.closedBy}</p>
+                             <p className="font-bold text-gray-700">{session.closed_at ? new Date(session.closed_at).toLocaleString() : new Date(session.opened_at).toLocaleString()}</p>
+                             <p className="text-sm text-gray-500">{t('adminPanel.cashDrawer.openedBy')}: {session.opened_by} / {t('adminPanel.cashDrawer.closedBy')}: {session.closed_by}</p>
                            </div>
                            <div className="flex items-center space-x-4">
                                <div className={`text-right font-semibold ${session.difference === 0 ? 'text-gray-600' : session.difference && session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
