@@ -143,7 +143,8 @@ CREATE TABLE IF NOT EXISTS session_history (
     "closingCash" NUMERIC,
     difference NUMERIC,
     "closedBy" TEXT,
-    "closedAt" TEXT
+    "closedAt" TEXT,
+    user_id INT REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS parked_orders (

@@ -35,18 +35,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       openedAt: string;
     };
     
-    // Check for an existing open session
-    const openSessionResult = await client.query('SELECT id FROM session_history WHERE "isOpen" = true');
-    if (openSessionResult && openSessionResult.rowCount != null && openSessionResult.rowCount > 0) {
+    // Check for an existing open session for this user
+    const openSessionResult = await client.query('SELECT id FROM session_history WHERE "isOpen" = true AND user_id = $1', [user.id]);
+    if (openSessionResult.rowCount > 0) {
       await client.query('ROLLBACK'); // No changes made, but good practice
-      return res.status(409).json({ error: 'An open session already exists.' });
+      return res.status(409).json({ error: 'You already have an open session.' });
     }
 
     const result = await client.query(
-      `INSERT INTO session_history ("isOpen", "startingCash", "openedBy", "openedAt", activities)
-       VALUES (true, $1, $2, $3, '[]')
+      `INSERT INTO session_history ("isOpen", "startingCash", "openedBy", "openedAt", activities, user_id)
+       VALUES (true, $1, $2, $3, '[]', $4)
        RETURNING *;`,
-      [startingCash, user.name, openedAt]
+      [startingCash, user.name, openedAt, user.id]
     );
     const newSession = result.rows[0];
 

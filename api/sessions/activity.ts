@@ -38,13 +38,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await client.query(
       `UPDATE session_history
        SET activities = activities || $1::jsonb
-       WHERE id = $2 AND "isOpen" = true
+       WHERE id = $2 AND "isOpen" = true AND user_id = $3
        RETURNING *;`,
-      [JSON.stringify(activity), sessionId]
+      [JSON.stringify(activity), sessionId, user.id]
     );
     
     if (result.rowCount === 0) {
-      throw new Error('Session not found or is closed');
+      throw new Error('Session not found, is closed, or does not belong to you.');
     }
     const updatedSession = result.rows[0];
 

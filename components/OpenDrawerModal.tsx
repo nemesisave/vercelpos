@@ -5,9 +5,10 @@ import { useCurrency } from '../context/CurrencyContext';
 interface OpenDrawerModalProps {
   isOpen: boolean;
   onOpenDrawer: (startingCash: number) => void;
+  onClose: () => void;
 }
 
-const OpenDrawerModal: React.FC<OpenDrawerModalProps> = ({ isOpen, onOpenDrawer }) => {
+const OpenDrawerModal: React.FC<OpenDrawerModalProps> = ({ isOpen, onOpenDrawer, onClose }) => {
   const [amount, setAmount] = useState('');
   const { t } = useTranslations();
   const { baseCurrencySymbol } = useCurrency();
@@ -28,7 +29,8 @@ const OpenDrawerModal: React.FC<OpenDrawerModalProps> = ({ isOpen, onOpenDrawer 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[100] p-4">
-      <div className="bg-surface rounded-lg shadow-xl w-full max-w-sm p-8 text-center">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-sm p-8 text-center relative">
+        <button type="button" onClick={onClose} className="absolute top-2 right-2 text-text-secondary/50 hover:text-text-primary text-3xl leading-none">&times;</button>
         <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-16 w-16 text-primary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
         </svg>

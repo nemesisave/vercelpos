@@ -37,11 +37,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         closedAt: string;
     };
 
-    const sessionResult = await client.query('SELECT * FROM session_history WHERE id = $1', [id]);
+    const sessionResult = await client.query('SELECT * FROM session_history WHERE id = $1 AND user_id = $2', [id, user.id]);
     if (sessionResult.rows.length === 0) {
-      throw new Error('Session not found');
+      throw new Error('Session not found for this user or you do not have permission.');
     }
     const session: CashDrawerSession = sessionResult.rows[0] as any;
+    if (!session.isOpen) {
+        throw new Error('This session is already closed.');
+    }
+
 
     const cashSales = session.activities
         .filter(a => a.type === 'sale' && a.paymentMethod === 'cash')
@@ -63,9 +67,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         difference = $2,
         "closedBy" = $3,
         "closedAt" = $4
-      WHERE id = $5
+      WHERE id = $5 AND user_id = $6
       RETURNING *;`,
-      [countedCash, difference, user.name, closedAt, id]
+      [countedCash, difference, user.name, closedAt, id, user.id]
     );
     const closedSession = result.rows[0];
 
@@ -82,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await client.query('ROLLBACK');
     console.error(`Error closing session ${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    if (errorMessage === 'Session not found') {
+    if (errorMessage.includes('Session not found')) {
         return res.status(404).json({ success: false, error: errorMessage });
     }
     res.status(500).json({ success: false, error: errorMessage });

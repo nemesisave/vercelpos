@@ -167,6 +167,7 @@ export interface CashDrawerSession {
   difference?: number;
   closedBy?: string;
   closedAt?: string;
+  user_id?: number;
 }
 
 // Supplier Management

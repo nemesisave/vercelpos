@@ -39,7 +39,7 @@ interface AppContentProps {
     isOrderSummaryOpen: boolean;
     productToWeigh: Product | null;
     isDrawerModalOpen: boolean;
-    isPinModalOpen: boolean;
+    setDrawerModalOpen: (isOpen: boolean) => void;
     pinEntryUser: User | null;
     pinError: string;
     discount: number;
@@ -102,7 +102,7 @@ const AppContent: React.FC<AppContentProps> = ({
     currentUser, users, roles, suppliers, customers, purchaseOrders, orderItems, products, parkedOrders,
     isCheckoutModalOpen, isAdminPanelOpen, completedOrders, refundTransactions,
     viewingReceipt, businessSettings, currentSession, sessionHistory, currencies,
-    auditLogs, isOrderSummaryOpen, productToWeigh, isDrawerModalOpen, isPinModalOpen,
+    auditLogs, isOrderSummaryOpen, productToWeigh, isDrawerModalOpen, setDrawerModalOpen,
     pinEntryUser, pinError, onPinSubmit, setPinEntryUser, setIsPinModalOpen, setPinError, onLockSession, 
     onOpenAdminPanel, onCloseAdminPanel, addToOrder, updateQuantity, removeFromOrder, 
     clearOrder, setCheckoutModalOpen, handlePaymentSuccess, setViewingReceipt, setProductToWeigh, 
@@ -165,11 +165,17 @@ const AppContent: React.FC<AppContentProps> = ({
               onUnparkSale={onUnparkSale}
             />
             <main className="grid flex-grow grid-cols-1 md:grid-cols-3 lg:grid-cols-4 overflow-hidden relative">
-            {isLocked && (
+            {isLocked && currentUser && (
                 <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-20 flex items-center justify-center p-4">
                     <div className="text-center p-8 bg-surface rounded-lg shadow-2xl">
                         <h2 className="text-2xl font-bold text-text-primary">{t('app.drawerClosedTitle')}</h2>
                         <p className="text-text-secondary mt-2">{t('app.drawerClosedMessage')}</p>
+                        <button 
+                            onClick={() => setDrawerModalOpen(true)}
+                            className="mt-6 px-6 py-3 bg-primary text-text-on-primary font-bold rounded-lg hover:bg-primary-hover transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/30"
+                        >
+                            {t('openDrawerModal.title')}
+                        </button>
                     </div>
                 </div>
             )}
@@ -251,6 +257,7 @@ const AppContent: React.FC<AppContentProps> = ({
             <OpenDrawerModal 
               isOpen={isDrawerModalOpen}
               onOpenDrawer={handleOpenDrawer}
+              onClose={() => setDrawerModalOpen(false)}
             />
 
             <SelectCustomerModal
@@ -330,6 +337,8 @@ const AppContent: React.FC<AppContentProps> = ({
               onProcessRefund={onProcessRefund}
               onSetCurrencies={onSetCurrencies}
               onFetchLatestRates={onFetchLatestRates}
+              onParkSale={onParkSale}
+              onUnparkSale={onUnparkSale}
               onAddCustomer={onAddCustomer}
               onUpdateCustomer={onUpdateCustomer}
               onDeleteCustomer={onDeleteCustomer}

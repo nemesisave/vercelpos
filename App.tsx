@@ -72,8 +72,13 @@ const App: React.FC = () => {
           setCurrencies(data.currencies || INITIAL_CURRENCIES);
           setParkedOrders(data.parkedOrders || []);
 
-          const openSession = data.sessionHistory.find(s => s.isOpen);
-          setCurrentSession(openSession || null);
+          if (user) {
+            const openSession = data.sessionHistory.find(s => s.isOpen && s.user_id === user.id);
+            setCurrentSession(openSession || null);
+          } else {
+            setCurrentSession(null);
+          }
+
 
           if (data.appSettings) {
             setThemeState(data.appSettings.theme);
@@ -500,7 +505,7 @@ const App: React.FC = () => {
     setPinEntryUser(null);
     setPinError('');
     
-    const openSession = sessionHistory.find(s => s.isOpen);
+    const openSession = sessionHistory.find(s => s.isOpen && s.user_id === user.id);
     setCurrentSession(openSession || null);
 
     if (!openSession) {
@@ -541,6 +546,7 @@ const App: React.FC = () => {
             openedAt: new Date().toISOString(),
         });
         setCurrentSession(newSession);
+        setSessionHistory(prev => [newSession, ...prev]);
         setDrawerModalOpen(false);
     } catch(e) {
         alert(`Failed to open cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -610,7 +616,7 @@ const App: React.FC = () => {
             return newProducts;
         });
 
-        if (currentSession) {
+        if (currentSession && paymentMethod === 'cash') {
              addActivity({
                 type: 'sale',
                 amount: newOrder.total,
@@ -645,6 +651,11 @@ const App: React.FC = () => {
       return <div className="flex items-center justify-center h-screen">Error: Business settings not loaded.</div>;
   }
 
+  const userRole = currentUser ? roles.find(r => r.id === currentUser.roleId) : null;
+  const displayedSessionHistory = currentUser && userRole && userRole.id !== 'admin'
+    ? sessionHistory.filter(s => s.user_id === currentUser.id)
+    : sessionHistory;
+
   return (
     <LanguageProvider language={language} setLanguage={handleSetLanguage}>
       <ThemeProvider theme={theme} setTheme={handleSetTheme}>
@@ -666,13 +677,13 @@ const App: React.FC = () => {
             viewingReceipt={viewingReceipt}
             businessSettings={businessSettings}
             currentSession={currentSession}
-            sessionHistory={sessionHistory}
+            sessionHistory={displayedSessionHistory}
             currencies={currencies}
             auditLogs={auditLogs}
             isOrderSummaryOpen={isOrderSummaryOpen}
             productToWeigh={productToWeigh}
             isDrawerModalOpen={isDrawerModalOpen}
-            isPinModalOpen={isPinModalOpen}
+            setDrawerModalOpen={setDrawerModalOpen}
             pinEntryUser={pinEntryUser}
             pinError={pinError}
             discount={discount}
@@ -712,6 +723,7 @@ const App: React.FC = () => {
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
+// @ts-ignore
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}
@@ -721,6 +733,7 @@ const App: React.FC = () => {
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
             onReceiveStock={handleReceiveStock}
             onProcessRefund={handleProcessRefund}
+// @ts-ignore
             onSetCurrencies={handleSetCurrencies}
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}
