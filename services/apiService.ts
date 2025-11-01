@@ -330,7 +330,7 @@ export const openSession = async (sessionData: { opening_amount: number; }): Pro
   return handleResponse<CashDrawerSession>(response);
 };
 
-export const addSessionActivity = async (sessionId: string, activity: Omit<CashDrawerActivity, 'id' | 'session_id' | 'user_id' | 'created_at'>): Promise<CashDrawerActivity[]> => {
+export const addSessionActivity = async (sessionId: string | number, activity: Omit<CashDrawerActivity, 'id' | 'session_id' | 'user_id' | 'created_at'>): Promise<CashDrawerActivity[]> => {
     const response = await fetch(`/api/sessions/activity`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -339,7 +339,7 @@ export const addSessionActivity = async (sessionId: string, activity: Omit<CashD
     return handleResponse<CashDrawerActivity[]>(response);
 };
 
-export const closeSession = async (sessionId: string, closingData: { closing_amount: number; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
+export const closeSession = async (sessionId: string | number, closingData: { closing_amount: number; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
     const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

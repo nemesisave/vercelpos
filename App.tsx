@@ -627,6 +627,11 @@ const App: React.FC = () => {
     }
   };
 
+  // FIX: Added onViewReceipt function to handle viewing a receipt from various parts of the app.
+  const onViewReceipt = (order: CompletedOrder) => {
+    setViewingReceipt(order);
+  };
+
   const handleSetCustomerForOrder = (customer: Customer | null) => {
     setSelectedCustomerForOrder(customer);
     setSelectCustomerModalOpen(false);
@@ -715,7 +720,7 @@ const App: React.FC = () => {
             onAddRole={handleAddRole}
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
-            onViewReceipt={(order) => setViewingReceipt(order)}
+            onViewReceipt={onViewReceipt}
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}

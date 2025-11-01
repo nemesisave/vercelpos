@@ -79,7 +79,7 @@ interface AppContentProps {
     onUpdateRolePermissions: (roleId: string, permissions: Permission[]) => void;
     onUpdateBusinessSettings: (settings: BusinessSettings) => void;
     onViewReceipt: (order: CompletedOrder) => void;
-    onCloseDrawer: (countedCash: number) => Promise<void>;
+    onCloseDrawer: (countedCash: number) => void;
     onPayIn: (amount: number, reason: string) => void;
     onPayOut: (amount: number, reason: string) => void;
     onAddSupplier: (data: NewSupplierPayload) => void;
@@ -88,7 +88,7 @@ interface AppContentProps {
     onCreatePurchaseOrder: (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }) => void;
     onReceiveStock: (purchaseOrderId: string, receivedQuantities: Record<number, number>) => void;
     onProcessRefund: (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean) => void;
-    onSetCurrencies: (currencies: Currency[]) => Promise<void>;
+    onSetCurrencies: (currencies: Currency[]) => void;
     onFetchLatestRates: () => Promise<void>;
     onParkSale: () => void;
     onUnparkSale: (id: string) => void;
@@ -370,8 +370,6 @@ const AppContent: React.FC<AppContentProps> = ({
               onProcessRefund={onProcessRefund}
               onSetCurrencies={onSetCurrencies}
               onFetchLatestRates={onFetchLatestRates}
-              onParkSale={onParkSale}
-              onUnparkSale={onUnparkSale}
               onAddCustomer={onAddCustomer}
               onUpdateCustomer={onUpdateCustomer}
               onDeleteCustomer={onDeleteCustomer}
