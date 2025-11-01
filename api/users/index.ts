@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       [username]
     );
 
-    if (existingUserCheck.rowCount > 0) {
+    if ((existingUserCheck?.rowCount ?? 0) > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Username already exists' });
     }

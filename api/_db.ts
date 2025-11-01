@@ -250,7 +250,7 @@ export async function seedInitialData() {
     for (const user of MOCK_USERS) {
         // Check for user regardless of deleted status
         const existing = await sql`SELECT id, deleted_at FROM users WHERE username = ${user.username} LIMIT 1`;
-        if (existing.rowCount > 0) {
+        if ((existing?.rowCount ?? 0) > 0) {
             // User exists, reactivate and update them
             await sql`UPDATE users SET name = ${user.name}, "roleId" = ${user.roleId}, password = ${user.password}, pin = ${user.pin}, "avatarUrl" = ${user.avatarUrl}, status = ${user.status}, "deleted_at" = NULL WHERE id = ${existing.rows[0].id}`;
         } else {
@@ -283,6 +283,10 @@ export async function ensureDbInitialized() {
             await sql.query(statement);
         }
     }
+
+    // Patch existing databases that might be missing columns
+    await sql`ALTER TABLE session_history ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;`;
+    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INT;`;
 
     // Drop old unique constraint and create a partial unique index for usernames
     // This allows reusing usernames of soft-deleted users.
