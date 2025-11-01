@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
     phone TEXT,
     email TEXT,
     address TEXT,
-    notes TEXT
+    notes TEXT,
+    lead_time_days INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS customers (
@@ -177,7 +178,7 @@ CREATE TABLE IF NOT EXISTS customers (
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
     id TEXT PRIMARY KEY,
-    "supplierId" INT REFERENCES suppliers(id),
+    "supplierId" INT REFERENCES suppliers(id) ON DELETE RESTRICT,
     "supplierName" TEXT,
     date TEXT,
     items JSONB,
@@ -227,7 +228,7 @@ CREATE TABLE IF NOT EXISTS cash_drawer_sessions (
 
 CREATE TABLE IF NOT EXISTS cash_drawer_activity (
   id SERIAL PRIMARY KEY,
-  session_id INT NOT NULL REFERENCES cash_drawer_sessions(id),
+  session_id INT NOT NULL REFERENCES cash_drawer_sessions(id) ON DELETE CASCADE,
   user_id INT NOT NULL,
   type TEXT NOT NULL,
   amount NUMERIC(12,2) NOT NULL,
@@ -270,7 +271,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE TABLE IF NOT EXISTS inventory_logs (
   id SERIAL PRIMARY KEY,
-  product_id INT NOT NULL,
+  product_id INT NOT NULL REFERENCES products(id),
   user_id INT NULL,
   change_amount NUMERIC(14,4) NOT NULL,
   new_stock NUMERIC(14,4) NOT NULL,
@@ -286,6 +287,11 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_completed_orders_date ON completed_orders(date DESC);
+CREATE INDEX IF NOT EXISTS idx_completed_orders_cashier ON completed_orders(cashier);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_logs_product_id ON inventory_logs(product_id);
 `;
 
 const MOCK_ROLES = [
@@ -299,16 +305,16 @@ const MOCK_USERS = [
 ];
 
 const MOCK_PRODUCTS = [
-    { id: 1, name: 'Espresso', price: { USD: 2.50, MXN: 45.00, CLP: 2300 }, purchasePrice: { USD: 1.20, MXN: 22.00, CLP: 1100 }, imageUrl: 'https://picsum.photos/id/225/400/300', category: 'Coffee', stock: 50, sellBy: 'unit' },
-    { id: 2, name: 'Latte', price: { USD: 3.50, MXN: 65.00, CLP: 3200 }, purchasePrice: { USD: 1.50, MXN: 28.00, CLP: 1400 }, imageUrl: 'https://picsum.photos/id/312/400/300', category: 'Coffee', stock: 50, sellBy: 'unit' },
-    { id: 3, name: 'Cappuccino', price: { USD: 3.50, MXN: 65.00, CLP: 3200 }, purchasePrice: { USD: 1.50, MXN: 28.00, CLP: 1400 }, imageUrl: 'https://picsum.photos/id/326/400/300', category: 'Coffee', stock: 45, sellBy: 'unit' },
-    { id: 7, name: 'Croissant', price: { USD: 2.75, MXN: 50.00, CLP: 2500 }, purchasePrice: { USD: 1.10, MXN: 20.00, CLP: 1000 }, imageUrl: 'https://picsum.photos/id/204/400/300', category: 'Pastries', stock: 30, sellBy: 'unit' },
-    { id: 15, name: 'Colombian Coffee Beans', price: { USD: 22.00, MXN: 400.00, CLP: 20000 }, purchasePrice: { USD: 10.50, MXN: 190.00, CLP: 9500 }, imageUrl: 'https://picsum.photos/id/225/400/300', category: 'Coffee Beans', stock: 15.5, sellBy: 'weight' },
+    { id: 1, name: 'Espresso', price: { USD: 2.50, MXN: 45.00, CLP: 2300 }, purchasePrice: { USD: 1.20, MXN: 22.00, CLP: 1100 }, imageUrl: 'https://picsum.photos/id/225/400/300', category: 'Coffee', stock: 50, sellBy: 'unit', barcode: '100001' },
+    { id: 2, name: 'Latte', price: { USD: 3.50, MXN: 65.00, CLP: 3200 }, purchasePrice: { USD: 1.50, MXN: 28.00, CLP: 1400 }, imageUrl: 'https://picsum.photos/id/312/400/300', category: 'Coffee', stock: 50, sellBy: 'unit', barcode: '100002' },
+    { id: 3, name: 'Cappuccino', price: { USD: 3.50, MXN: 65.00, CLP: 3200 }, purchasePrice: { USD: 1.50, MXN: 28.00, CLP: 1400 }, imageUrl: 'https://picsum.photos/id/326/400/300', category: 'Coffee', stock: 45, sellBy: 'unit', barcode: '100003' },
+    { id: 7, name: 'Croissant', price: { USD: 2.75, MXN: 50.00, CLP: 2500 }, purchasePrice: { USD: 1.10, MXN: 20.00, CLP: 1000 }, imageUrl: 'https://picsum.photos/id/204/400/300', category: 'Pastries', stock: 30, sellBy: 'unit', barcode: '100007' },
+    { id: 15, name: 'Colombian Coffee Beans', price: { USD: 22.00, MXN: 400.00, CLP: 20000 }, purchasePrice: { USD: 10.50, MXN: 190.00, CLP: 9500 }, imageUrl: 'https://picsum.photos/id/225/400/300', category: 'Coffee Beans', stock: 15.5, sellBy: 'weight', barcode: '100015' },
 ];
 
 const MOCK_SUPPLIERS = [
-    { id: 1, name: 'Supreme Coffee Roasters', contactPerson: 'Sarah Chen', phone: '555-0101', email: 'sarah.c@supremecoffee.com', address: '123 Roast St, Bean Town', notes: 'Weekly delivery on Tuesdays' },
-    { id: 2, name: 'Patisserie Deluxe', contactPerson: 'Pierre Dubois', phone: '555-0102', email: 'orders@patisseriedeluxe.com', address: '45 Flour Ln, Pastryville', notes: '' },
+    { id: 1, name: 'Supreme Coffee Roasters', contactPerson: 'Sarah Chen', phone: '555-0101', email: 'sarah.c@supremecoffee.com', address: '123 Roast St, Bean Town', notes: 'Weekly delivery on Tuesdays', lead_time_days: 3 },
+    { id: 2, name: 'Patisserie Deluxe', contactPerson: 'Pierre Dubois', phone: '555-0102', email: 'orders@patisseriedeluxe.com', address: '45 Flour Ln, Pastryville', notes: '', lead_time_days: 2 },
 ];
 
 const MOCK_BUSINESS_SETTINGS = {
@@ -352,11 +358,11 @@ export async function seedInitialData() {
     }
 
     for (const product of MOCK_PRODUCTS) {
-        await sql`INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy") VALUES (${product.name}, ${JSON.stringify(product.price)}, ${JSON.stringify(product.purchasePrice)}, ${product.imageUrl}, ${product.category}, ${product.stock}, ${product.sellBy}) ON CONFLICT (name) DO NOTHING;`;
+        await sql`INSERT INTO products (name, price, "purchasePrice", "imageUrl", category, stock, "sellBy", barcode) VALUES (${product.name}, ${JSON.stringify(product.price)}, ${JSON.stringify(product.purchasePrice)}, ${product.imageUrl}, ${product.category}, ${product.stock}, ${product.sellBy}, ${product.barcode}) ON CONFLICT (name) DO NOTHING;`;
     }
 
     for (const supplier of MOCK_SUPPLIERS) {
-        await sql`INSERT INTO suppliers (name, "contactPerson", phone, email, address, notes) VALUES (${supplier.name}, ${supplier.contactPerson}, ${supplier.phone}, ${supplier.email}, ${supplier.address}, ${supplier.notes}) ON CONFLICT (name) DO NOTHING;`;
+        await sql`INSERT INTO suppliers (name, "contactPerson", phone, email, address, notes, lead_time_days) VALUES (${supplier.name}, ${supplier.contactPerson}, ${supplier.phone}, ${supplier.email}, ${supplier.address}, ${supplier.notes}, ${supplier.lead_time_days}) ON CONFLICT (name) DO NOTHING;`;
     }
 }
 
@@ -380,6 +386,7 @@ export async function ensureDbInitialized() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`;
     await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode TEXT;`;
     await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold NUMERIC(14,4) DEFAULT 10;`;
+    await sql`ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS lead_time_days INTEGER;`;
     
     // Drop old unique constraint and create a partial unique index for usernames
     await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;`;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Product, ProductUpdatePayload } from '../types';
 import { useTranslations } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -86,14 +86,17 @@ const InventoryCountTab: React.FC<InventoryCountTabProps> = ({ products, onUpdat
     const { formatCurrency, baseCurrencyCode } = useCurrency();
     const [counts, setCounts] = useState<Record<number, string>>({});
     const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [scanInput, setScanInput] = useState('');
+    const scanInputRef = useRef<HTMLInputElement>(null);
+    const productInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
     useEffect(() => {
-        // Initialize counts with current stock values
         const initialCounts = products.reduce((acc, product) => {
             acc[product.id] = product.stock.toString();
             return acc;
         }, {} as Record<number, string>);
         setCounts(initialCounts);
+        scanInputRef.current?.focus();
     }, [products]);
 
     const handleCountChange = (productId: number, value: string) => {
@@ -101,6 +104,19 @@ const InventoryCountTab: React.FC<InventoryCountTabProps> = ({ products, onUpdat
             ...prev,
             [productId]: value,
         }));
+    };
+
+    const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const product = products.find(p => p.barcode === scanInput);
+            if (product) {
+                const inputRef = productInputRefs.current[product.id];
+                inputRef?.focus();
+                inputRef?.select();
+            }
+            setScanInput('');
+        }
     };
 
     const discrepancies = useMemo(() => {
@@ -135,6 +151,17 @@ const InventoryCountTab: React.FC<InventoryCountTabProps> = ({ products, onUpdat
             <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-800">{t('adminPanel.inventoryCount.title')}</h3>
                 <p className="text-sm text-gray-500">{t('adminPanel.inventoryCount.description')}</p>
+                 <div className="mt-4">
+                    <input
+                        ref={scanInputRef}
+                        type="text"
+                        value={scanInput}
+                        onChange={(e) => setScanInput(e.target.value)}
+                        onKeyDown={handleScan}
+                        placeholder="Scan barcode and press Enter..."
+                        className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
             </div>
 
             <div className="flex-grow overflow-y-auto -mx-6 px-6">
@@ -165,6 +192,7 @@ const InventoryCountTab: React.FC<InventoryCountTabProps> = ({ products, onUpdat
                                     <div className="col-span-2 text-center text-gray-700 font-medium">{product.sellBy === 'weight' ? expected.toFixed(3) : expected}</div>
                                     <div className="col-span-2 text-center">
                                         <input
+                                            ref={el => productInputRefs.current[product.id] = el}
                                             type="number"
                                             value={countedStr}
                                             step={product.sellBy === 'weight' ? "0.001" : "1"}

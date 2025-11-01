@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { CompletedOrder, Product } from '../types';
 import { useTranslations } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -12,6 +12,16 @@ interface DashboardTabProps {
 
 type DateRange = 'today' | 'week' | 'month' | 'all';
 
+interface SalesByCashier {
+    cashier: string;
+    total_revenue: number;
+    total_sales: number;
+}
+interface SalesByHour {
+    hour: number;
+    total_revenue: number;
+}
+
 const StatCard: React.FC<{ title: string; value: string; subtext?: string; icon: React.ReactNode }> = ({ title, value, subtext, icon }) => (
   <div className="bg-white p-6 rounded-lg shadow-md flex items-center space-x-4">
     <div className="bg-blue-100 text-blue-600 rounded-full p-3">
@@ -24,6 +34,60 @@ const StatCard: React.FC<{ title: string; value: string; subtext?: string; icon:
     </div>
   </div>
 );
+
+const SalesByCashierChart: React.FC<{ data: SalesByCashier[] }> = ({ data }) => {
+    const { t } = useTranslations();
+    const { formatCurrency } = useCurrency();
+    const totalRevenue = useMemo(() => data.reduce((sum, item) => sum + item.total_revenue, 0), [data]);
+    
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md h-full flex flex-col">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Ventas por Cajero</h3>
+            <div className="space-y-3 overflow-y-auto">
+                {data.map((item, index) => {
+                    const percentage = totalRevenue > 0 ? (item.total_revenue / totalRevenue) * 100 : 0;
+                    return (
+                        <div key={index} className="text-sm">
+                            <div className="flex justify-between mb-1">
+                                <span className="font-medium text-gray-700">{item.cashier} ({item.total_sales} ventas)</span>
+                                <span className="font-semibold text-gray-600">{formatCurrency(item.total_revenue)}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const SalesByHourChart: React.FC<{ data: SalesByHour[] }> = ({ data }) => {
+    const { t } = useTranslations();
+    const { formatCurrency } = useCurrency();
+    const maxRevenue = useMemo(() => Math.max(...data.map(item => item.total_revenue)), [data]);
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md h-full flex flex-col">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Ventas por Hora</h3>
+            <div className="flex-grow flex items-end space-x-1">
+                {data.map((item) => {
+                    const barHeight = maxRevenue > 0 ? (item.total_revenue / maxRevenue) * 100 : 0;
+                    return (
+                        <div key={item.hour} className="flex-1 flex flex-col items-center group" title={`${item.hour}:00 - ${formatCurrency(item.total_revenue)}`}>
+                            <div className="w-full h-32 flex items-end">
+                                <div className="bg-blue-400 group-hover:bg-blue-600 w-full rounded-t-sm" style={{ height: `${barHeight}%` }}></div>
+                            </div>
+                            <span className="text-xs text-gray-500 mt-1">{item.hour.toString().padStart(2, '0')}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 
 const CategorySalesChart: React.FC<{ data: { name: string, value: number, formattedValue: string }[] }> = ({ data }) => {
     const { t } = useTranslations();
@@ -75,6 +139,22 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
   const { t } = useTranslations();
   const { formatCurrency, baseCurrencyCode } = useCurrency();
   const [dateRange, setDateRange] = useState<DateRange>('all');
+  const [detailedStats, setDetailedStats] = useState<{ salesByCashier: SalesByCashier[], salesByHour: SalesByHour[] } | null>(null);
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      try {
+        const res = await fetch('/api/reports/dashboard-details');
+        if (res.ok) {
+          const data = await res.json();
+          setDetailedStats(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch dashboard details", e);
+      }
+    };
+    fetchDetails();
+  }, []);
 
   const filteredOrders = useMemo(() => {
     if (dateRange === 'all') return completedOrders;
@@ -192,13 +272,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ completedOrders, products, 
         <StatCard title={t('adminPanel.dashboard.mostProfitableItem')} value={stats.topProfitableProduct?.name || 'N/A'} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         <CategorySalesChart data={stats.categoryChartData} />
-        {/* Placeholder for another chart or table if needed */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-           <h3 className="text-lg font-semibold text-gray-700 mb-4">{t('adminPanel.dashboard.topProducts')}</h3>
-           <p className="text-sm text-gray-500">Placeholder for another detailed view.</p>
-        </div>
+        {detailedStats && <SalesByCashierChart data={detailedStats.salesByCashier} />}
+        {detailedStats && <SalesByHourChart data={detailedStats.salesByHour} />}
       </div>
     </div>
   );

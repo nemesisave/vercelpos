@@ -185,6 +185,7 @@ export interface Supplier {
   email: string;
   address?: string;
   notes?: string;
+  lead_time_days?: number;
 }
 
 export interface NewSupplierPayload {
@@ -194,6 +195,7 @@ export interface NewSupplierPayload {
     email: string;
     address?: string;
     notes?: string;
+    lead_time_days?: number;
 }
 
 export interface SupplierUpdatePayload extends Partial<NewSupplierPayload> {}

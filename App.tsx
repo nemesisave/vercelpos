@@ -5,14 +5,82 @@ import type { Currency } from './currencies';
 import { LanguageProvider, useTranslations } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { ToastProvider, useToasts } from './components/ToastProvider';
 import AppContent from './components/AppContent';
 import * as api from './services/apiService';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 
+const AppWithProviders: React.FC = () => {
+  const [theme, setThemeState] = useState<ThemeName>('default');
+  const [language, setLanguageState] = useState<'en' | 'es'>('es');
+  
+  // These will be loaded from the API later
+  const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
+  const [currencies, setCurrencies] = useState<Currency[]>(INITIAL_CURRENCIES);
+
+  const handleSetTheme = async (newTheme: ThemeName) => {
+    setThemeState(newTheme);
+    try {
+        await api.updateAppSettings({ theme: newTheme });
+    } catch (e) {
+        console.error("Failed to save theme", e);
+    }
+  };
+
+  const handleSetLanguage = async (newLang: 'en' | 'es') => {
+      setLanguageState(newLang);
+      try {
+          await api.updateAppSettings({ language: newLang });
+      } catch (e) {
+          console.error("Failed to save language", e);
+      }
+  };
+  
+  // This effect will run once on mount to get initial settings
+  useEffect(() => {
+    const fetchInitialSettings = async () => {
+        try {
+            const data = await api.getInitialData();
+            if (data.appSettings) {
+                setThemeState(data.appSettings.theme);
+                setLanguageState(data.appSettings.language);
+            }
+            if(data.businessSettings) {
+                setBusinessSettings(data.businessSettings);
+            }
+             if(data.currencies) {
+                setCurrencies(data.currencies);
+            }
+        } catch(e) {
+            console.error("Failed to load initial settings", e);
+        }
+    };
+    fetchInitialSettings();
+  }, []);
+
+  if (!businessSettings) {
+     return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  return (
+    <LanguageProvider language={language} setLanguage={handleSetLanguage}>
+      <ThemeProvider theme={theme} setTheme={handleSetTheme}>
+        <CurrencyProvider businessSettings={businessSettings} currencies={currencies}>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
+        </CurrencyProvider>
+      </ThemeProvider>
+    </LanguageProvider>
+  )
+}
+
+
 const App: React.FC = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToasts();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -46,14 +114,10 @@ const App: React.FC = () => {
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState<Customer | null>(null);
   const [isSelectCustomerModalOpen, setSelectCustomerModalOpen] = useState(false);
 
-  const [theme, setThemeState] = useState<ThemeName>('default');
-  const [language, setLanguageState] = useState<'en' | 'es'>('es');
-
   const loadInitialData = async () => {
       setIsInitialLoad(true);
       setError(null);
       try {
-          // Check for authenticated user first
           const user = await api.getCurrentUser().catch(() => null);
           setCurrentUser(user);
 
@@ -78,12 +142,6 @@ const App: React.FC = () => {
           } else {
             setCurrentSession(null);
           }
-
-
-          if (data.appSettings) {
-            setThemeState(data.appSettings.theme);
-            setLanguageState(data.appSettings.language);
-          }
       } catch (e) {
           setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
       } finally {
@@ -97,80 +155,62 @@ const App: React.FC = () => {
   
   const { t } = useTranslations();
 
-  const handleSetTheme = async (newTheme: ThemeName) => {
-    setThemeState(newTheme); // Optimistic update
-    try {
-        await api.updateAppSettings({ theme: newTheme });
-    } catch (e) {
-        console.error("Failed to save theme", e);
-    }
-  };
-
-  const handleSetLanguage = async (newLang: 'en' | 'es') => {
-      setLanguageState(newLang);
-      try {
-          await api.updateAppSettings({ language: newLang });
-      } catch (e) {
-          console.error("Failed to save language", e);
-      }
-  };
-
-  const addAuditLog = useCallback(async (action: string, details: string) => {
-    try {
-        const newLog = await api.addAuditLog(action, details);
-        setAuditLogs(prev => [newLog, ...prev]);
-    } catch (error) {
-        console.error("Failed to add audit log:", error);
-    }
-  }, []);
-
   const handleUpdateBusinessSettings = async (newSettings: BusinessSettings) => {
     try {
         const updatedSettings = await api.updateBusinessSettings(newSettings);
         setBusinessSettings(updatedSettings);
-        // Audit log now handled by backend
+        showToast(t('adminPanel.settings.settingsSaved'), 'success');
     } catch (error) {
-        alert(`Failed to update business settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to update settings: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
-  const handleUpdateProduct = useCallback(async (productId: number, updates: ProductUpdatePayload) => {
+ const handleUpdateProduct = useCallback(async (productId: number, updates: ProductUpdatePayload) => {
+    const originalProducts = [...products];
+    const productIndex = originalProducts.findIndex(p => p.id === productId);
+    if (productIndex === -1) return;
+
+    const newProducts = [...originalProducts];
+    newProducts[productIndex] = { ...newProducts[productIndex], ...updates } as Product;
+    setProducts(newProducts);
+
     try {
-        const updatedProduct = await api.updateProduct(productId, updates);
-        setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
-        // Audit log handled by backend
+        const updatedProductFromApi = await api.updateProduct(productId, updates);
+        setProducts(prev => prev.map(p => p.id === productId ? updatedProductFromApi : p));
+        showToast(t('adminPanel.inventory.save'), 'success');
     } catch (error) {
-        alert(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setProducts(originalProducts);
+        showToast(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
-  }, []);
+}, [products, showToast, t]);
   
   const handleDeleteProduct = useCallback(async (productId: number) => {
     try {
         await api.deleteProduct(productId);
         setProducts(prev => prev.filter(p => p.id !== productId));
-        // Audit log handled by backend
+        showToast('Product deleted', 'success');
     } catch (error) {
-        alert(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const handleAddNewProduct = useCallback(async (newProductData: NewProductPayload) => {
     try {
         const newProduct = await api.addProduct(newProductData);
         setProducts(prev => [newProduct, ...prev]);
-        // Audit log handled by backend
+        showToast('Product added successfully', 'success');
     } catch (error) {
-        alert(`Failed to add new product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to add new product: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const handleAddNewUser = async (newUserData: NewUserPayload) => {
     try {
         const newUser = await api.addUser(newUserData);
         setUsers(prev => [...prev, newUser]);
-        // Audit log handled by backend
+        showToast('User added', 'success');
     } catch (error) {
-        alert(`Failed to add new user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to add user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
   
@@ -181,23 +221,23 @@ const App: React.FC = () => {
         if (currentUser?.id === userId) {
             setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
         }
-        // Audit log handled by backend
+        showToast('User updated', 'success');
     } catch (error) {
-        alert(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
   const handleDeleteUser = async (userId: number) => {
     if (currentUser?.id === userId) {
-      alert("You cannot delete your own account.");
+      showToast("You cannot delete your own account.", 'error');
       return;
     }
     try {
         await api.deleteUser(userId);
         setUsers(prev => prev.filter(u => u.id !== userId));
-        // Audit log handled by backend
+        showToast('User deleted', 'success');
     } catch (error) {
-        alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
   
@@ -205,10 +245,10 @@ const App: React.FC = () => {
     try {
         const newCustomer = await api.addCustomer(newCustomerData);
         setCustomers(prev => [newCustomer, ...prev]);
-        addAuditLog('ADD_CUSTOMER', `Added new customer: ${newCustomer.name}`);
+        showToast('Customer added', 'success');
         return newCustomer;
     } catch(e) { 
-      alert(`Error: ${e instanceof Error ? e.message : 'Failed to add customer.'}`);
+      showToast(`Error: ${e instanceof Error ? e.message : 'Failed to add customer.'}`, 'error');
       throw e;
     }
   };
@@ -217,22 +257,21 @@ const App: React.FC = () => {
      try {
         const updatedCustomer = await api.updateCustomer(id, data);
         setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
-        addAuditLog('UPDATE_CUSTOMER', `Updated customer: ${updatedCustomer.name}`);
-    } catch(e) { alert(`Error: ${e instanceof Error ? e.message : 'Failed to update customer.'}`); }
+        showToast('Customer updated', 'success');
+    } catch(e) { showToast(`Error: ${e instanceof Error ? e.message : 'Failed to update customer.'}`, 'error'); }
   };
 
   const handleDeleteCustomer = async (id: number) => {
     try {
-        const customerName = customers.find(c => c.id === id)?.name || `ID ${id}`;
         await api.deleteCustomer(id);
         setCustomers(prev => prev.filter(c => c.id !== id));
-        addAuditLog('DELETE_CUSTOMER', `Deleted customer: ${customerName}`);
-    } catch(e) { alert(`Error: ${e instanceof Error ? e.message : 'Failed to delete customer.'}`); }
+        showToast('Customer deleted', 'success');
+    } catch(e) { showToast(`Error: ${e instanceof Error ? e.message : 'Failed to delete customer.'}`, 'error'); }
   };
 
   const handleUpdateUserStatus = (userId: number, status: 'active' | 'inactive') => {
     if (currentUser?.id === userId) {
-        alert(t('app.deactivateSelfError'));
+        showToast(t('app.deactivateSelfError'), 'error');
         return;
     }
     handleUpdateUser(userId, { status });
@@ -242,9 +281,9 @@ const App: React.FC = () => {
      try {
         const newRole = await api.addRole(newRoleData);
         setRoles(prev => [...prev, newRole]);
-        // Audit log handled by backend
+        showToast('Role added', 'success');
     } catch (error) {
-        alert(`Failed to add role: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to add role: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
   
@@ -252,9 +291,9 @@ const App: React.FC = () => {
     try {
         const updatedRole = await api.updateRolePermissions(roleId, permissions);
         setRoles(prev => prev.map(r => r.id === roleId ? updatedRole : r));
-        // Audit log handled by backend
+        showToast(t('adminPanel.users.permissionsUpdated'), 'success');
     } catch (error) {
-        alert(`Failed to update role permissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to update permissions: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -262,9 +301,9 @@ const App: React.FC = () => {
     try {
         const newSupplier = await api.addSupplier(newSupplierData);
         setSuppliers(prev => [...prev, newSupplier]);
-        // Audit log handled by backend
+        showToast('Supplier added', 'success');
     } catch (error) {
-        alert(`Failed to add supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to add supplier: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -272,9 +311,9 @@ const App: React.FC = () => {
     try {
         const updatedSupplier = await api.updateSupplier(supplierId, updates);
         setSuppliers(prev => prev.map(s => s.id === supplierId ? updatedSupplier : s));
-        // Audit log handled by backend
+        showToast('Supplier updated', 'success');
     } catch (error) {
-         alert(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+         showToast(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -283,9 +322,9 @@ const App: React.FC = () => {
         try {
             await api.deleteSupplier(supplierId);
             setSuppliers(prev => prev.filter(s => s.id !== supplierId));
-            // Audit log handled by backend
+            showToast('Supplier deleted', 'success');
         } catch(error) {
-            alert(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            showToast(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         }
     }
   };
@@ -294,9 +333,9 @@ const App: React.FC = () => {
     try {
         const newPO = await api.createPurchaseOrder(orderData);
         setPurchaseOrders(prev => [newPO, ...prev]);
-        // Audit log handled by backend
+        showToast('Purchase order created', 'success');
     } catch (error) {
-         alert(`Failed to create purchase order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+         showToast(`Failed to create PO: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -312,9 +351,9 @@ const App: React.FC = () => {
             });
             return newProducts;
         });
-        // Audit log handled by backend
+        showToast('Stock received', 'success');
     } catch (error) {
-        alert(`Failed to receive stock: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to receive stock: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -333,9 +372,9 @@ const App: React.FC = () => {
                 return newProducts;
             });
         }
-        // Audit log handled by backend
+        showToast('Refund processed', 'success');
     } catch (error) {
-        alert(`Failed to process refund: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -344,8 +383,7 @@ const App: React.FC = () => {
         const updatedCurrencies = await api.updateCurrencies(newCurrencies);
         setCurrencies(updatedCurrencies);
     } catch (error) {
-        console.error("Failed to save currency settings:", error);
-        alert(`Failed to save currency settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to save currency settings: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -354,15 +392,15 @@ const App: React.FC = () => {
         const { currencies: newCurrencies, businessSettings: newSettings } = await api.fetchLatestCurrencyRates();
         setCurrencies(newCurrencies);
         setBusinessSettings(newSettings);
+        showToast('Currency rates updated', 'success');
     } catch (error) {
-        console.error("Failed to fetch latest currency rates:", error);
-        alert(`Failed to fetch latest currency rates: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to fetch rates: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
   const addToOrder = useCallback(async (product: Product, quantity = 1) => {
     if (currentSession?.status !== 'open') {
-        alert(t('app.drawerClosedError'));
+        showToast(t('app.drawerClosedError'), 'error');
         return;
     }
     
@@ -389,9 +427,9 @@ const App: React.FC = () => {
         }
       });
     } else {
-      alert(`${product.name} ${t('app.outOfStock')}`);
+      showToast(`${product.name} ${t('app.outOfStock')}`, 'error');
     }
-  }, [products, orderItems, t, currentSession]);
+  }, [products, orderItems, t, currentSession, showToast]);
 
    const handleWeightEntered = (product: Product, weight: number) => {
     if (weight <= 0) {
@@ -417,7 +455,7 @@ const App: React.FC = () => {
         }
       });
     } else {
-      alert(`${t('app.onlyStockAvailable')} ${productInStock.stock.toFixed(3)}kg ${t('app.of')} ${productInStock.name} ${t('app.inStock')}.`);
+      showToast(`${t('app.onlyStockAvailable')} ${productInStock.stock.toFixed(3)}kg ${t('app.of')} ${productInStock.name} ${t('app.inStock')}.`, 'error');
     }
     setProductToWeigh(null);
   };
@@ -444,9 +482,9 @@ const App: React.FC = () => {
         const stockMessage = productInStock?.sellBy === 'weight'
             ? `${productInStock.stock.toFixed(3)}kg`
             : `${productInStock?.stock}`;
-        alert(`${t('app.onlyStockAvailable')} ${stockMessage} ${t('app.of')} ${productInStock?.name} ${t('app.inStock')}.`);
+        showToast(`${t('app.onlyStockAvailable')} ${stockMessage} ${t('app.of')} ${productInStock?.name} ${t('app.inStock')}.`, 'error');
     }
-  }, [products, removeFromOrder, t]);
+  }, [products, removeFromOrder, t, showToast]);
 
   const clearOrder = useCallback(() => {
     setOrderItems([]);
@@ -464,7 +502,7 @@ const App: React.FC = () => {
             setParkedOrders(prev => [...prev, newParkedOrder]);
             clearOrder();
         } catch (error) {
-            alert(`Failed to park sale: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            showToast(`Failed to park sale: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         }
     }
   };
@@ -482,7 +520,7 @@ const App: React.FC = () => {
             setOrderItems(orderToUnpark.items);
             setParkedOrders(prev => prev.filter(p => p.id !== parkedOrderId));
         } catch (error) {
-            alert(`Failed to unpark sale: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            showToast(`Failed to unpark sale: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         }
     }
   };
@@ -507,11 +545,6 @@ const App: React.FC = () => {
     
     const openSession = sessionHistory.find(s => s.status === 'open' && s.user_id === user.id);
     setCurrentSession(openSession || null);
-
-    if (!openSession) {
-      // The drawer might need to be opened. We don't force it here anymore,
-      // the main UI will show the 'Drawer Closed' overlay with an open button.
-    }
     handleUpdateUser(user.id, { lastLogin });
     setFailedLoginAttempts(prev => {
         const newAttempts = { ...prev };
@@ -541,14 +574,13 @@ const App: React.FC = () => {
   
   const handleOpenDrawer = async (startingCash: number) => {
     if (!currentUser) return;
-
     try {
         const newSession = await api.openSession({ opening_amount: startingCash });
         setCurrentSession(newSession);
         setSessionHistory(prev => [newSession, ...prev]);
         setDrawerModalOpen(false);
     } catch(e) {
-        alert(`Failed to open cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        showToast(`Failed to open session: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -558,9 +590,9 @@ const App: React.FC = () => {
         const { session: closedSession, message } = await api.closeSession(currentSession.id, { closing_amount: countedCash });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
         setCurrentSession(null);
-        alert(message);
+        showToast(message, 'success');
     } catch(e) {
-        alert(`Failed to close cash drawer session: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        showToast(`Failed to close session: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -569,11 +601,11 @@ const App: React.FC = () => {
     
     try {
         const updatedActivities = await api.addSessionActivity(currentSession.id, activity);
-        setCurrentSession(prev => prev ? { ...prev, activities: updatedActivities } : null);
-        // Update history in case it's displayed
-        setSessionHistory(prev => prev.map(s => s.id === currentSession.id ? { ...s, activities: updatedActivities } : s));
+        const updatedSession = { ...currentSession, activities: updatedActivities };
+        setCurrentSession(updatedSession);
+        setSessionHistory(prev => prev.map(s => s.id === currentSession.id ? updatedSession : s));
     } catch(e) {
-        alert(`Failed to record activity: ${activity.type}. Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        showToast(`Failed to record activity: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
     }
   };
   
@@ -582,7 +614,7 @@ const App: React.FC = () => {
   };
 
   const handlePayOut = (amount: number, reason: string) => {
-    addActivity({ type: 'pay-out', amount, notes: reason });
+    addActivity({ type: 'pay-out', amount: -amount, notes: reason });
   };
 
   const handlePaymentSuccess = async (paymentMethod: PaymentMethod) => {
@@ -590,13 +622,8 @@ const App: React.FC = () => {
 
     try {
         const { updatedProducts, newOrder } = await api.processPayment(
-            orderItems,
-            businessSettings,
-            paymentMethod,
-            tip,
-            discount,
-            selectedCustomerForOrder?.id,
-            selectedCustomerForOrder?.name,
+            orderItems, businessSettings, paymentMethod, tip, discount,
+            selectedCustomerForOrder?.id, selectedCustomerForOrder?.name
         );
         
         setCompletedOrders(prev => [newOrder, ...prev]);
@@ -610,24 +637,17 @@ const App: React.FC = () => {
         });
 
         if (currentSession && paymentMethod === 'cash') {
-             addActivity({
-                type: 'sale',
-                amount: newOrder.total,
-                order_id: newOrder.invoiceId,
-                payment_method: paymentMethod,
-            });
+             addActivity({ type: 'sale', amount: newOrder.total, order_id: newOrder.invoiceId, payment_method: paymentMethod });
         }
 
         clearOrder();
         setCheckoutModalOpen(false);
         setViewingReceipt(newOrder);
     } catch (error) {
-        console.error("Payment processing failed:", error);
-        alert(`Payment processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
-  // FIX: Added onViewReceipt function to handle viewing a receipt from various parts of the app.
   const onViewReceipt = (order: CompletedOrder) => {
     setViewingReceipt(order);
   };
@@ -655,93 +675,88 @@ const App: React.FC = () => {
     : sessionHistory;
 
   return (
-    <LanguageProvider language={language} setLanguage={handleSetLanguage}>
-      <ThemeProvider theme={theme} setTheme={handleSetTheme}>
-        <CurrencyProvider businessSettings={businessSettings} currencies={currencies}>
-          <AppContent
-            currentUser={currentUser}
-            users={users}
-            roles={roles}
-            suppliers={suppliers}
-            customers={customers}
-            purchaseOrders={purchaseOrders}
-            orderItems={orderItems}
-            products={products}
-            parkedOrders={parkedOrders}
-            isCheckoutModalOpen={isCheckoutModalOpen}
-            isAdminPanelOpen={isAdminPanelOpen}
-            completedOrders={completedOrders}
-            refundTransactions={refundTransactions}
-            viewingReceipt={viewingReceipt}
-            businessSettings={businessSettings}
-            currentSession={currentSession}
-            sessionHistory={displayedSessionHistory}
-            currencies={currencies}
-            auditLogs={auditLogs}
-            isOrderSummaryOpen={isOrderSummaryOpen}
-            productToWeigh={productToWeigh}
-            isDrawerModalOpen={isDrawerModalOpen}
-            setDrawerModalOpen={setDrawerModalOpen}
-            pinEntryUser={pinEntryUser}
-            pinError={pinError}
-            discount={discount}
-            tip={tip}
-            selectedCustomerForOrder={selectedCustomerForOrder}
-            isSelectCustomerModalOpen={isSelectCustomerModalOpen}
-            setSelectCustomerModalOpen={setSelectCustomerModalOpen}
-            onSetCustomerForOrder={handleSetCustomerForOrder}
-            setDiscount={setDiscount}
-            setTip={setTip}
-            onPinSubmit={handlePinSubmit}
-            setPinEntryUser={setPinEntryUser}
-            setIsPinModalOpen={setIsPinModalOpen}
-            setPinError={setPinError}
-            onLockSession={handleLockSession}
-            onOpenAdminPanel={() => setAdminPanelOpen(true)}
-            onCloseAdminPanel={() => setAdminPanelOpen(false)}
-            addToOrder={addToOrder}
-            updateQuantity={updateQuantity}
-            removeFromOrder={removeFromOrder}
-            clearOrder={clearOrder}
-            setCheckoutModalOpen={setCheckoutModalOpen}
-            handlePaymentSuccess={handlePaymentSuccess}
-            setViewingReceipt={setViewingReceipt}
-            setProductToWeigh={setProductToWeigh}
-            handleWeightEntered={handleWeightEntered}
-            handleOpenDrawer={handleOpenDrawer}
-            setOrderSummaryOpen={setOrderSummaryOpen}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onAddProduct={handleAddNewProduct}
-            onAddUser={handleAddNewUser}
-            onUpdateUser={handleUpdateUser}
-            onUpdateUserStatus={handleUpdateUserStatus}
-            onDeleteUser={handleDeleteUser}
-            onAddRole={handleAddRole}
-            onUpdateRolePermissions={handleUpdateRolePermissions}
-            onUpdateBusinessSettings={handleUpdateBusinessSettings}
-            onViewReceipt={onViewReceipt}
-            onCloseDrawer={handleCloseDrawer}
-            onPayIn={handlePayIn}
-            onPayOut={handlePayOut}
-            onAddSupplier={handleAddSupplier}
-            onUpdateSupplier={handleUpdateSupplier}
-            onDeleteSupplier={handleDeleteSupplier}
-            onCreatePurchaseOrder={handleCreatePurchaseOrder}
-            onReceiveStock={handleReceiveStock}
-            onProcessRefund={handleProcessRefund}
-            onSetCurrencies={handleSetCurrencies}
-            onFetchLatestRates={handleFetchLatestRates}
-            onParkSale={handleParkSale}
-            onUnparkSale={handleUnparkSale}
-            onAddCustomer={handleAddCustomer}
-            onUpdateCustomer={handleUpdateCustomer}
-            onDeleteCustomer={handleDeleteCustomer}
-          />
-        </CurrencyProvider>
-      </ThemeProvider>
-    </LanguageProvider>
+      <AppContent
+        currentUser={currentUser}
+        users={users}
+        roles={roles}
+        suppliers={suppliers}
+        customers={customers}
+        purchaseOrders={purchaseOrders}
+        orderItems={orderItems}
+        products={products}
+        parkedOrders={parkedOrders}
+        isCheckoutModalOpen={isCheckoutModalOpen}
+        isAdminPanelOpen={isAdminPanelOpen}
+        completedOrders={completedOrders}
+        refundTransactions={refundTransactions}
+        viewingReceipt={viewingReceipt}
+        businessSettings={businessSettings}
+        currentSession={currentSession}
+        sessionHistory={displayedSessionHistory}
+        currencies={currencies}
+        auditLogs={auditLogs}
+        isOrderSummaryOpen={isOrderSummaryOpen}
+        productToWeigh={productToWeigh}
+        isDrawerModalOpen={isDrawerModalOpen}
+        setDrawerModalOpen={setDrawerModalOpen}
+        pinEntryUser={pinEntryUser}
+        pinError={pinError}
+        discount={discount}
+        tip={tip}
+        selectedCustomerForOrder={selectedCustomerForOrder}
+        isSelectCustomerModalOpen={isSelectCustomerModalOpen}
+        setSelectCustomerModalOpen={setSelectCustomerModalOpen}
+        onSetCustomerForOrder={handleSetCustomerForOrder}
+        setDiscount={setDiscount}
+        setTip={setTip}
+        onPinSubmit={handlePinSubmit}
+        setPinEntryUser={setPinEntryUser}
+        setIsPinModalOpen={setIsPinModalOpen}
+        setPinError={setPinError}
+        // FIX: `onLockSession` was passed instead of `handleLockSession`.
+        onLockSession={handleLockSession}
+        onOpenAdminPanel={() => setAdminPanelOpen(true)}
+        onCloseAdminPanel={() => setAdminPanelOpen(false)}
+        addToOrder={addToOrder}
+        updateQuantity={updateQuantity}
+        removeFromOrder={removeFromOrder}
+        clearOrder={clearOrder}
+        setCheckoutModalOpen={setCheckoutModalOpen}
+        handlePaymentSuccess={handlePaymentSuccess}
+        setViewingReceipt={setViewingReceipt}
+        setProductToWeigh={setProductToWeigh}
+        handleWeightEntered={handleWeightEntered}
+        handleOpenDrawer={handleOpenDrawer}
+        setOrderSummaryOpen={setOrderSummaryOpen}
+        onUpdateProduct={handleUpdateProduct}
+        onDeleteProduct={handleDeleteProduct}
+        onAddProduct={handleAddNewProduct}
+        onAddUser={handleAddNewUser}
+        onUpdateUser={handleUpdateUser}
+        onUpdateUserStatus={handleUpdateUserStatus}
+        onDeleteUser={handleDeleteUser}
+        onAddRole={handleAddRole}
+        onUpdateRolePermissions={handleUpdateRolePermissions}
+        onUpdateBusinessSettings={handleUpdateBusinessSettings}
+        onViewReceipt={onViewReceipt}
+        onCloseDrawer={handleCloseDrawer}
+        onPayIn={handlePayIn}
+        onPayOut={handlePayOut}
+        onAddSupplier={handleAddSupplier}
+        onUpdateSupplier={handleUpdateSupplier}
+        onDeleteSupplier={handleDeleteSupplier}
+        onCreatePurchaseOrder={handleCreatePurchaseOrder}
+        onReceiveStock={handleReceiveStock}
+        onProcessRefund={handleProcessRefund}
+        onSetCurrencies={handleSetCurrencies}
+        onFetchLatestRates={handleFetchLatestRates}
+        onParkSale={handleParkSale}
+        onUnparkSale={handleUnparkSale}
+        onAddCustomer={handleAddCustomer}
+        onUpdateCustomer={handleUpdateCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+      />
   );
 };
 
-export default App;
+export default AppWithProviders;

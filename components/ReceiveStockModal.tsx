@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import type { PurchaseOrder } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import type { PurchaseOrder, Product } from '../types';
 import { useTranslations } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 
@@ -7,6 +7,7 @@ interface ReceiveStockModalProps {
   isOpen: boolean;
   onClose: () => void;
   purchaseOrder: PurchaseOrder;
+  products: Product[]; // Pass all products to find by barcode
   onConfirmReceive: (purchaseOrderId: string, receivedQuantities: Record<number, number>) => void;
 }
 
@@ -14,10 +15,20 @@ const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
   isOpen,
   onClose,
   purchaseOrder,
+  products,
   onConfirmReceive
 }) => {
     const { t } = useTranslations();
     const [quantities, setQuantities] = useState<Record<number, string>>({});
+    const [scanInput, setScanInput] = useState('');
+    const scanInputRef = useRef<HTMLInputElement>(null);
+    const itemInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+    useEffect(() => {
+        if(isOpen) {
+            scanInputRef.current?.focus();
+        }
+    }, [isOpen]);
 
     const handleQuantityChange = (productId: number, value: string) => {
         const item = purchaseOrder.items.find(i => i.productId === productId);
@@ -27,6 +38,19 @@ const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
 
         if (value === '' || (numValue >= 0 && numValue <= maxReceivable)) {
             setQuantities(prev => ({ ...prev, [productId]: value }));
+        }
+    };
+
+    const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const product = products.find(p => p.barcode === scanInput);
+            if (product && purchaseOrder.items.some(item => item.productId === product.id)) {
+                const inputRef = itemInputRefs.current[product.id];
+                inputRef?.focus();
+                inputRef?.select();
+            }
+            setScanInput('');
         }
     };
 
@@ -47,7 +71,6 @@ const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
         }
 
         onConfirmReceive(purchaseOrder.id, receivedQuantities);
-        alert(t('receiveStockModal.receptionSuccess'));
         onClose();
     };
 
@@ -59,10 +82,21 @@ const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
                 <div className="p-6 border-b">
                     <h2 className="text-xl font-bold text-gray-800">{t('receiveStockModal.title')} #{purchaseOrder.id}</h2>
                 </div>
-                <div className="flex-grow overflow-y-auto p-6">
+                <div className="p-4">
+                    <input
+                        ref={scanInputRef}
+                        type="text"
+                        value={scanInput}
+                        onChange={(e) => setScanInput(e.target.value)}
+                        onKeyDown={handleScan}
+                        placeholder="Scan barcode and press Enter..."
+                        className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <div className="flex-grow overflow-y-auto p-6 pt-0">
                     <div className="bg-white rounded-lg border">
                         {/* Header */}
-                        <div className="grid grid-cols-5 gap-4 p-4 font-semibold text-xs text-gray-600 border-b bg-gray-50">
+                        <div className="grid grid-cols-5 gap-4 p-4 font-semibold text-xs text-gray-600 border-b bg-gray-50 sticky top-0">
                             <div className="col-span-2">{t('receiveStockModal.product')}</div>
                             <div className="text-center">{t('receiveStockModal.ordered')}</div>
                             <div className="text-center">{t('receiveStockModal.received')}</div>
@@ -79,6 +113,7 @@ const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
                                     <div className="text-center text-green-600 font-medium">{item.quantityReceived}</div>
                                     <div className="text-center">
                                         <input
+                                            ref={el => itemInputRefs.current[item.productId] = el}
                                             type="number"
                                             value={quantities[item.productId] || ''}
                                             onChange={(e) => handleQuantityChange(item.productId, e.target.value)}

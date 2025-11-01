@@ -183,7 +183,6 @@ const RolePermissionsEditor: React.FC<{
 
   const handleSave = () => {
     onUpdateRolePermissions(role.id, Array.from(permissions));
-    alert(t('adminPanel.users.permissionsUpdated'));
   };
 
   const sortedCurrentPermissions = Array.from(permissions).sort();
@@ -267,6 +266,10 @@ const InventoryRow: React.FC<{
   const { t } = useTranslations();
   const { formatCurrency, formatAmount, selectedCurrencyCode, baseCurrencyCode } = useCurrency();
   const [isPriceModalOpen, setPriceModalOpen] = useState(false);
+
+  useEffect(() => {
+    setStock(product.stock.toString());
+  }, [product.stock]);
 
   const stockValue = parseFloat(stock);
   const stockStatus = isNaN(stockValue) ? 'ok' : stockValue === 0 ? 'out' : stockValue <= LOW_STOCK_THRESHOLD ? 'low' : 'ok';
@@ -577,7 +580,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
         ...settings,
         taxRate: settings.taxRate / 100
     });
-    alert(t('adminPanel.settings.settingsSaved'));
   };
 
   const openEditUserModal = (user: User) => {
@@ -614,7 +616,6 @@ const InventoryPanel: React.FC<InventoryPanelProps> = ({
         c.code === code ? { ...c, rate: newRate } : c
     );
     onSetCurrencies(updatedCurrencies);
-    alert(`Rate for ${code} updated successfully.`);
   };
 
   const handleFetchRates = async () => {
