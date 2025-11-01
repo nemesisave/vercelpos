@@ -77,7 +77,7 @@ const Header: React.FC<HeaderProps> = ({ user, roles, cashDrawerSession, parkedO
 
 
             <div className="hidden sm:flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-full text-sm">
-                {cashDrawerSession?.isOpen ? (
+                {cashDrawerSession?.status === 'open' ? (
                 <>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
                     <span className="font-semibold text-green-700">{t('header.drawerOpen')}</span>
@@ -125,7 +125,7 @@ const Header: React.FC<HeaderProps> = ({ user, roles, cashDrawerSession, parkedO
                                 </button>
                                 )}
                                 <div className="sm:hidden flex items-center p-3 text-sm">
-                                    {cashDrawerSession?.isOpen ? (
+                                    {cashDrawerSession?.status === 'open' ? (
                                     <div className="flex items-center space-x-2 text-green-700">
                                         <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
                                         <span className="font-semibold">{t('header.drawerOpen')}</span>
