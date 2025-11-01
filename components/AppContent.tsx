@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { OrderItem, Product, ProductUpdatePayload, NewProductPayload, User, NewUserPayload, UserUpdatePayload, CompletedOrder, PaymentMethod, BusinessSettings, CashDrawerSession, Supplier, NewSupplierPayload, SupplierUpdatePayload, PurchaseOrder, PurchaseOrderItem, Role, Permission, RefundTransaction, AuditLog, ParkedOrder, Customer, NewCustomerPayload, CustomerUpdatePayload } from '../types';
 import type { Currency } from '../currencies';
 import { useTranslations } from '../context/LanguageContext';
@@ -79,7 +79,7 @@ interface AppContentProps {
     onUpdateRolePermissions: (roleId: string, permissions: Permission[]) => void;
     onUpdateBusinessSettings: (settings: BusinessSettings) => void;
     onViewReceipt: (order: CompletedOrder) => void;
-    onCloseDrawer: (countedCash: number) => void;
+    onCloseDrawer: (countedCash: number) => Promise<void>;
     onPayIn: (amount: number, reason: string) => void;
     onPayOut: (amount: number, reason: string) => void;
     onAddSupplier: (data: NewSupplierPayload) => void;
@@ -88,7 +88,7 @@ interface AppContentProps {
     onCreatePurchaseOrder: (orderData: { supplierId: number; supplierName: string; items: Omit<PurchaseOrderItem, 'quantityReceived'>[]; totalCost: number; }) => void;
     onReceiveStock: (purchaseOrderId: string, receivedQuantities: Record<number, number>) => void;
     onProcessRefund: (originalInvoiceId: string, itemsToRefund: { id: number; quantity: number }[], restock: boolean) => void;
-    onSetCurrencies: (currencies: Currency[]) => void;
+    onSetCurrencies: (currencies: Currency[]) => Promise<void>;
     onFetchLatestRates: () => Promise<void>;
     onParkSale: () => void;
     onUnparkSale: (id: string) => void;
@@ -117,6 +117,9 @@ const AppContent: React.FC<AppContentProps> = ({
     const { formatCurrency } = useCurrency();
     const { t } = useTranslations();
     
+    // FIX: Moved searchQuery state declaration before its usage in useEffect.
+    const [searchQuery, setSearchQuery] = useState('');
+
     const orderTotal = useMemo(() => {
         if (!businessSettings) return 0;
         const baseCurrency = businessSettings.currency;
@@ -137,6 +140,36 @@ const AppContent: React.FC<AppContentProps> = ({
         setPinError('');
     };
 
+    useEffect(() => {
+        const handleKeyDown = async (event: KeyboardEvent) => {
+            // Simple barcode scanner detection: fast numeric input ending with Enter
+            // In a real scenario, this would be more robust (e.g., checking timing, prefixes/suffixes)
+            if (event.key === 'Enter' && /^\d{5,}$/.test(searchQuery)) {
+                try {
+                    const product = await (await fetch(`/api/products/by-barcode?code=${searchQuery}`)).json();
+                    if (product && !product.error) {
+                       addToOrder(product);
+                    }
+                } catch (error) {
+                    console.warn(`No product found for barcode: ${searchQuery}`);
+                }
+                setSearchQuery('');
+            } else if (event.key.length === 1 && !isNaN(parseInt(event.key))) {
+                setSearchQuery(prev => prev + event.key);
+            } else if (event.key === 'Backspace') {
+                setSearchQuery(prev => prev.slice(0, -1));
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [searchQuery, addToOrder]);
+
+
+
+
     if (!currentUser) {
         return (
             <>
@@ -151,7 +184,7 @@ const AppContent: React.FC<AppContentProps> = ({
         );
     }
     
-    const isLocked = !currentSession || !currentSession.isOpen;
+    const isLocked = !currentSession || currentSession.status !== 'open';
 
     return (
         <div className="flex flex-col h-screen font-sans text-text-primary bg-background">

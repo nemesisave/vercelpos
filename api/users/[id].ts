@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized, sql } from '../_db.js';
+import { ensureDbInitialized, sql, writeAuditLog } from '../_db.js';
 import { UserUpdatePayload, User } from '../../types.js';
 import { db } from '@vercel/postgres';
 
@@ -8,10 +8,10 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
     const sessionId = req.cookies.session_id;
     if (!sessionId) return null;
     const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
-    if (sessionResult.rowCount === 0) return null;
+    if ((sessionResult?.rowCount ?? 0) === 0) return null;
     const userId = sessionResult.rows[0].user_id;
-    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
-    if (userResult.rowCount === 0) return null;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND deleted_at IS NULL`;
+    if ((userResult?.rowCount ?? 0) === 0) return null;
     return userResult.rows[0] as User;
 }
 
@@ -66,29 +66,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const result = await client.query(query, values);
         const { password: _, ...updatedUser } = result.rows[0];
         
-        await client.query(
-            `INSERT INTO audit_logs (user_id, user_name, action, details) VALUES ($1, $2, 'UPDATE_USER', $3)`,
-            [actor.id, actor.name, `Updated user details for ${updatedUser.name}`]
-        );
+        await writeAuditLog({
+            userId: actor.id,
+            userName: actor.name,
+            action: 'UPDATE_USER',
+            entity: 'users',
+            entityId: id,
+            details: { updates: Object.keys(updates) }
+        });
 
         await client.query('COMMIT');
         res.status(200).json(updatedUser);
 
     } else if (req.method === 'DELETE') {
-        // Invalidate all active sessions for this user
-        await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [id]);
-
-        // Soft delete the user
-        const result = await client.query('UPDATE users SET "deleted_at" = NOW(), status = \'inactive\' WHERE id = $1 RETURNING name', [id]);
+        // Hard delete the user
+        const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING name', [id]);
         if (result.rowCount === 0) {
             throw new Error('User not found');
         }
         const deletedUserName = result.rows[0].name;
-
-        await client.query(
-            `INSERT INTO audit_logs (user_id, user_name, action, details) VALUES ($1, $2, 'DELETE_USER', $3)`,
-            [actor.id, actor.name, `Deleted user: ${deletedUserName} (ID: ${id})`]
-        );
+        
+        await writeAuditLog({
+            userId: actor.id,
+            userName: actor.name,
+            action: 'DELETE_USER',
+            entity: 'users',
+            entityId: id,
+            details: { deletedUserName }
+        });
         
         await client.query('COMMIT');
         res.status(200).json({ success: true });

@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized, sql } from '../_db.js';
-import { CashDrawerSession, User } from '../../types.js';
+import { ensureDbInitialized, sql, writeAuditLog } from '../_db.js';
+import { CashDrawerSession, User, CashDrawerActivity } from '../../types.js';
 import { db } from '@vercel/postgres';
 
 // Helper to get user from session
@@ -8,10 +8,10 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
     const sessionId = req.cookies.session_id;
     if (!sessionId) return null;
     const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
-    if (sessionResult.rowCount === 0) return null;
+    if ((sessionResult?.rowCount ?? 0) === 0) return null;
     const userId = sessionResult.rows[0].user_id;
-    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
-    if (userResult.rowCount === 0) return null;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND deleted_at IS NULL`;
+    if ((userResult?.rowCount ?? 0) === 0) return null;
     return userResult.rows[0] as User;
 }
 
@@ -32,55 +32,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    const { countedCash, closedAt } = req.body as {
-        countedCash: number;
-        closedAt: string;
+    const { closing_amount } = req.body as {
+        closing_amount: number;
     };
 
-    const sessionResult = await client.query('SELECT * FROM session_history WHERE id = $1 AND user_id = $2', [id, user.id]);
+    const sessionResult = await client.query('SELECT * FROM cash_drawer_sessions WHERE id = $1 AND user_id = $2', [id, user.id]);
     if (sessionResult.rows.length === 0) {
       throw new Error('Session not found for this user or you do not have permission.');
     }
     const session: CashDrawerSession = sessionResult.rows[0] as any;
-    if (!session.isOpen) {
+    if (session.status !== 'open') {
         throw new Error('This session is already closed.');
     }
 
+    const activitiesResult = await client.query('SELECT * FROM cash_drawer_activity WHERE session_id = $1', [id]);
+    const activities: CashDrawerActivity[] = activitiesResult.rows as any;
 
-    const cashSales = session.activities
-        .filter(a => a.type === 'sale' && a.paymentMethod === 'cash')
-        .reduce((sum, a) => sum + a.amount, 0);
-    const totalPayIns = session.activities
+    const cashSales = activities
+        .filter(a => a.type === 'sale' && a.payment_method === 'cash')
+        .reduce((sum, a) => sum + Number(a.amount), 0);
+    const totalPayIns = activities
         .filter(a => a.type === 'pay-in')
-        .reduce((sum, a) => sum + a.amount, 0);
-    const totalPayOuts = session.activities
+        .reduce((sum, a) => sum + Number(a.amount), 0);
+    const totalPayOuts = activities
         .filter(a => a.type === 'pay-out')
-        .reduce((sum, a) => sum + a.amount, 0);
+        .reduce((sum, a) => sum + Number(a.amount), 0);
 
-    const expectedInDrawer = Number(session.startingCash) + cashSales + totalPayIns - totalPayOuts;
-    const difference = countedCash - expectedInDrawer;
+    const expectedInDrawer = Number(session.opening_amount) + cashSales + totalPayIns - totalPayOuts;
+    const difference = closing_amount - expectedInDrawer;
 
     const result = await client.query(
-      `UPDATE session_history SET
-        "isOpen" = false,
-        "closingCash" = $1,
+      `UPDATE cash_drawer_sessions SET
+        status = 'closed',
+        closing_amount = $1,
         difference = $2,
-        "closedBy" = $3,
-        "closedAt" = $4
-      WHERE id = $5 AND user_id = $6
+        closed_by = $3,
+        closed_at = NOW()
+      WHERE id = $4 AND user_id = $5
       RETURNING *;`,
-      [countedCash, difference, user.name, closedAt, id, user.id]
+      [closing_amount, difference, user.name, id, user.id]
     );
     const closedSession = result.rows[0];
 
-    await client.query(
-      `INSERT INTO audit_logs (user_id, user_name, action, details)
-       VALUES ($1, $2, 'CLOSE_CASH_DRAWER', $3);`,
-      [user.id, user.name, `Closed session #${id} with difference of ${difference.toFixed(2)}`]
-    );
+    await writeAuditLog({
+        userId: user.id,
+        userName: user.name,
+        action: 'CLOSE_CASH_DRAWER',
+        details: { sessionId: id, difference }
+    });
 
     await client.query('COMMIT');
-    res.status(200).json({ success: true, message: 'Cash drawer session closed successfully.', session: closedSession });
+    res.status(200).json({ success: true, message: 'Cash drawer closed successfully for this user.', session: closedSession });
 
   } catch (error) {
     await client.query('ROLLBACK');

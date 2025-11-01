@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized, sql } from '../_db.js';
+import { ensureDbInitialized, sql, writeAuditLog } from '../_db.js';
 import { db } from '@vercel/postgres';
 import { User } from '../../types.js';
 
@@ -8,10 +8,10 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
     const sessionId = req.cookies.session_id;
     if (!sessionId) return null;
     const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
-    if (sessionResult.rowCount === 0) return null;
+    if ((sessionResult?.rowCount ?? 0) === 0) return null;
     const userId = sessionResult.rows[0].user_id;
-    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
-    if (userResult.rowCount === 0) return null;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND deleted_at IS NULL`;
+    if ((userResult?.rowCount ?? 0) === 0) return null;
     return userResult.rows[0] as User;
 }
 
@@ -30,31 +30,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    const { startingCash, openedAt } = req.body as {
-      startingCash: number;
-      openedAt: string;
+    const { opening_amount } = req.body as {
+      opening_amount: number;
     };
     
     // Check for an existing open session for this user
-    const openSessionResult = await client.query('SELECT id FROM session_history WHERE "isOpen" = true AND user_id = $1 ORDER BY "openedAt" DESC LIMIT 1', [user.id]);
+    const openSessionResult = await client.query('SELECT id FROM cash_drawer_sessions WHERE status = \'open\' AND user_id = $1 ORDER BY opened_at DESC LIMIT 1', [user.id]);
     if ((openSessionResult?.rowCount ?? 0) > 0) {
       await client.query('ROLLBACK'); // No changes made, but good practice
       return res.status(409).json({ error: 'You already have an open session.' });
     }
 
     const result = await client.query(
-      `INSERT INTO session_history ("isOpen", "startingCash", "openedBy", "openedAt", activities, user_id)
-       VALUES (true, $1, $2, $3, '[]', $4)
+      `INSERT INTO cash_drawer_sessions (user_id, opening_amount, status, opened_at, opened_by)
+       VALUES ($1, $2, 'open', NOW(), $3)
        RETURNING *;`,
-      [startingCash, user.name, openedAt, user.id]
+      [user.id, opening_amount, user.name]
     );
     const newSession = result.rows[0];
 
-    await client.query(
-      `INSERT INTO audit_logs (user_id, user_name, action, details)
-       VALUES ($1, $2, 'OPEN_CASH_DRAWER', $3);`,
-       [user.id, user.name, `Opened session #${newSession.id} with starting cash of ${startingCash}`]
-    );
+    await writeAuditLog({
+        userId: user.id,
+        userName: user.name,
+        action: 'OPEN_CASH_DRAWER',
+        details: { sessionId: newSession.id, opening_amount }
+    });
     
     await client.query('COMMIT');
     res.status(201).json(newSession);

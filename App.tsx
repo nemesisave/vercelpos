@@ -73,7 +73,7 @@ const App: React.FC = () => {
           setParkedOrders(data.parkedOrders || []);
 
           if (user) {
-            const openSession = data.sessionHistory.find(s => s.isOpen && s.user_id === user.id);
+            const openSession = data.sessionHistory.find(s => s.status === 'open' && s.user_id === user.id);
             setCurrentSession(openSession || null);
           } else {
             setCurrentSession(null);
@@ -361,7 +361,7 @@ const App: React.FC = () => {
   };
 
   const addToOrder = useCallback(async (product: Product, quantity = 1) => {
-    if (!currentSession?.isOpen) {
+    if (currentSession?.status !== 'open') {
         alert(t('app.drawerClosedError'));
         return;
     }
@@ -505,13 +505,14 @@ const App: React.FC = () => {
     setPinEntryUser(null);
     setPinError('');
     
-    const openSession = sessionHistory.find(s => s.isOpen && s.user_id === user.id);
+    const openSession = sessionHistory.find(s => s.status === 'open' && s.user_id === user.id);
     setCurrentSession(openSession || null);
 
     if (!openSession) {
-      setDrawerModalOpen(true);
+      // The drawer might need to be opened. We don't force it here anymore,
+      // the main UI will show the 'Drawer Closed' overlay with an open button.
     }
-    handleUpdateUser(user.id, { lastLogin }); // This is now just a frontend state update and a call to the backend
+    handleUpdateUser(user.id, { lastLogin });
     setFailedLoginAttempts(prev => {
         const newAttempts = { ...prev };
         delete newAttempts[user.username];
@@ -534,6 +535,7 @@ const App: React.FC = () => {
   const handleLockSession = async () => {
     await api.logout();
     setCurrentUser(null);
+    setCurrentSession(null);
     clearOrder();
   };
   
@@ -541,10 +543,7 @@ const App: React.FC = () => {
     if (!currentUser) return;
 
     try {
-        const newSession = await api.openSession({
-            startingCash,
-            openedAt: new Date().toISOString(),
-        });
+        const newSession = await api.openSession({ opening_amount: startingCash });
         setCurrentSession(newSession);
         setSessionHistory(prev => [newSession, ...prev]);
         setDrawerModalOpen(false);
@@ -556,10 +555,7 @@ const App: React.FC = () => {
   const handleCloseDrawer = async (countedCash: number) => {
     if (!currentSession || !currentUser) return;
     try {
-        const { session: closedSession, message } = await api.closeSession(currentSession.id, {
-            countedCash,
-            closedAt: new Date().toISOString(),
-        });
+        const { session: closedSession, message } = await api.closeSession(currentSession.id, { closing_amount: countedCash });
         setSessionHistory(prev => [closedSession, ...prev.filter(s => s.id !== closedSession.id)]);
         setCurrentSession(null);
         alert(message);
@@ -568,17 +564,14 @@ const App: React.FC = () => {
     }
   };
 
-  const addActivity = async (activity: Omit<CashDrawerActivity, 'timestamp'>) => {
+  const addActivity = async (activity: Omit<CashDrawerActivity, 'created_at' | 'id' | 'session_id' | 'user_id'>) => {
     if (!currentSession || !currentUser) return;
-    const fullActivity: CashDrawerActivity = {
-        ...activity,
-        timestamp: new Date().toISOString(),
-    };
+    
     try {
-        const updatedSession = await api.addSessionActivity(currentSession.id, fullActivity);
-        setCurrentSession(updatedSession);
+        const updatedActivities = await api.addSessionActivity(currentSession.id, activity);
+        setCurrentSession(prev => prev ? { ...prev, activities: updatedActivities } : null);
         // Update history in case it's displayed
-        setSessionHistory(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+        setSessionHistory(prev => prev.map(s => s.id === currentSession.id ? { ...s, activities: updatedActivities } : s));
     } catch(e) {
         alert(`Failed to record activity: ${activity.type}. Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
@@ -620,8 +613,8 @@ const App: React.FC = () => {
              addActivity({
                 type: 'sale',
                 amount: newOrder.total,
-                orderId: newOrder.invoiceId,
-                paymentMethod,
+                order_id: newOrder.invoiceId,
+                payment_method: paymentMethod,
             });
         }
 
@@ -723,7 +716,6 @@ const App: React.FC = () => {
             onUpdateRolePermissions={handleUpdateRolePermissions}
             onUpdateBusinessSettings={handleUpdateBusinessSettings}
             onViewReceipt={(order) => setViewingReceipt(order)}
-// @ts-ignore
             onCloseDrawer={handleCloseDrawer}
             onPayIn={handlePayIn}
             onPayOut={handlePayOut}
@@ -733,7 +725,6 @@ const App: React.FC = () => {
             onCreatePurchaseOrder={handleCreatePurchaseOrder}
             onReceiveStock={handleReceiveStock}
             onProcessRefund={handleProcessRefund}
-// @ts-ignore
             onSetCurrencies={handleSetCurrencies}
             onFetchLatestRates={handleFetchLatestRates}
             onParkSale={handleParkSale}

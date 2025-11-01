@@ -320,7 +320,8 @@ export const fetchLatestCurrencyRates = async (): Promise<{ currencies: Currency
 };
 
 // --- CASH DRAWER SESSIONS ---
-export const openSession = async (sessionData: { startingCash: number; openedAt: string; }): Promise<CashDrawerSession> => {
+// FIX: Corrected function signatures for cash drawer operations to match backend API and fix type errors.
+export const openSession = async (sessionData: { opening_amount: number; }): Promise<CashDrawerSession> => {
   const response = await fetch('/api/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -329,16 +330,16 @@ export const openSession = async (sessionData: { startingCash: number; openedAt:
   return handleResponse<CashDrawerSession>(response);
 };
 
-export const addSessionActivity = async (sessionId: number, activity: CashDrawerActivity): Promise<CashDrawerSession> => {
+export const addSessionActivity = async (sessionId: string, activity: Omit<CashDrawerActivity, 'id' | 'session_id' | 'user_id' | 'created_at'>): Promise<CashDrawerActivity[]> => {
     const response = await fetch(`/api/sessions/activity`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, activity }),
     });
-    return handleResponse<CashDrawerSession>(response);
+    return handleResponse<CashDrawerActivity[]>(response);
 };
 
-export const closeSession = async (sessionId: number, closingData: { countedCash: number; closedAt: string; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
+export const closeSession = async (sessionId: string, closingData: { closing_amount: number; }): Promise<{ session: CashDrawerSession; message: string; success: boolean; }> => {
     const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

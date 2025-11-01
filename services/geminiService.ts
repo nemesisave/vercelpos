@@ -1,19 +1,17 @@
-import type { Permission, Product, CompletedOrder, AuditLog } from '../types';
+// AI is disabled in this project. Keep the stub so imports don’t break.
+const errorMessage = 'Gemini / Google AI is disabled in this deployment.';
 
-const errorMessage = 'Gemini/Google AI is disabled in this deployment.';
-
-export const getRolePermissionSuggestions = async (roleName: string): Promise<Permission[]> => {
-  console.warn(errorMessage, `(Suggestion for role "${roleName}" was requested)`);
-  // Return an empty array to prevent breaking any UI expecting an array.
+export async function getRolePermissionSuggestions() {
+  console.warn(errorMessage);
   return Promise.resolve([]);
-};
+}
 
-export const getBusinessAnalysis = async (products: Product[], completedOrders: CompletedOrder[], baseCurrencyCode: string): Promise<string> => {
+export async function getBusinessAnalysis() {
   console.error(errorMessage);
   throw new Error(errorMessage);
-};
+}
 
-export const analyzeUserActivity = async (userName: string, auditLogs: AuditLog[]): Promise<string> => {
+export async function analyzeUserActivity() {
     console.error(errorMessage);
     throw new Error(errorMessage);
-};
+}

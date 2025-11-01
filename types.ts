@@ -8,7 +8,9 @@ export interface Product {
   imageUrl: string;
   category: string;
   stock: number; // a.k.a. quantity in stock (units or kg)
-  sellBy: 'unit' | 'weight'; // New property
+  sellBy: 'unit' | 'weight';
+  barcode?: string;
+  low_stock_threshold?: number;
 }
 
 export interface NewProductPayload {
@@ -147,28 +149,32 @@ export interface BusinessSettings {
 export type CashDrawerActivityType = 'sale' | 'pay-in' | 'pay-out';
 
 export interface CashDrawerActivity {
+  id: string;
+  session_id: string;
+  user_id: number;
   type: CashDrawerActivityType;
   amount: number;
-  timestamp: string;
+  created_at: string;
   notes?: string;
-  orderId?: string;
-  paymentMethod?: PaymentMethod;
+  order_id?: string;
+  payment_method?: PaymentMethod;
 }
-
 
 export interface CashDrawerSession {
-  id: number; // Session ID
-  isOpen: boolean;
-  startingCash: number;
-  openedBy: string; // User name
-  openedAt: string; // Date string
-  activities: CashDrawerActivity[];
-  closingCash?: number;
+  id: string;
+  user_id: number;
+  opening_amount: number;
+  closing_amount?: number;
+  status: 'open' | 'closed';
+  opened_at: string;
+  closed_at?: string;
+  opened_by?: string; // User name
+  closed_by?: string; // User name
+  // activities are now fetched separately
+  activities?: CashDrawerActivity[]; 
   difference?: number;
-  closedBy?: string;
-  closedAt?: string;
-  user_id?: number;
 }
+
 
 // Supplier Management
 export interface Supplier {
@@ -220,7 +226,7 @@ export interface AuditLog {
     user_id: number;
     user_name: string;
     action: string;
-    details: string;
+    details: any; // Can be string or JSON object
 }
 
 export interface Customer {
@@ -281,4 +287,15 @@ export interface InitialData {
     auditLogs: AuditLog[];
     currencies: Currency[];
     parkedOrders: ParkedOrder[];
+}
+
+export interface InventoryLog {
+  id: string;
+  product_id: number;
+  user_id: number;
+  change_amount: number;
+  new_stock: number;
+  reason: 'sale' | 'refund' | 'po_receive' | 'manual_count';
+  reference_id?: string;
+  created_at: string;
 }

@@ -11,6 +11,33 @@ if (!process.env.DATABASE_URL) {
 // Use the vercelSql export for general queries, as it handles connection pooling.
 export const sql = vercelSql;
 
+export async function writeAuditLog(opts: {
+  userId?: number;
+  userName?: string;
+  action: string;
+  entity?: string;
+  entityId?: string | number;
+  details?: any;
+}) {
+  const { userId, userName, action, entity, entityId, details } = opts;
+  try {
+      await sql`
+        INSERT INTO audit_logs (user_id, user_name, action, entity, entity_id, details)
+        VALUES (
+          ${userId ?? null},
+          ${userName ?? null},
+          ${action},
+          ${entity ?? null},
+          ${entityId ? String(entityId) : null},
+          ${details ? JSON.stringify(details) : null}
+        )
+      `;
+  } catch (e) {
+      console.error("Failed to write audit log:", e);
+      // Don't throw error from here, as it might interrupt a critical transaction.
+  }
+}
+
 export const schemaSql = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -62,23 +89,25 @@ CREATE TABLE IF NOT EXISTS users (
     "avatarUrl" TEXT,
     status TEXT,
     "lastLogin" TIMESTAMPTZ,
-    "deleted_at" TIMESTAMPTZ
+    deleted_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    name TEXT,
+    name TEXT UNIQUE,
     price JSONB,
     "purchasePrice" JSONB,
     "imageUrl" TEXT,
     category TEXT,
     stock NUMERIC,
-    "sellBy" TEXT
+    "sellBy" TEXT,
+    barcode TEXT,
+    low_stock_threshold NUMERIC(14,4) DEFAULT 10
 );
 
 CREATE TABLE IF NOT EXISTS suppliers (
     id SERIAL PRIMARY KEY,
-    name TEXT,
+    name TEXT UNIQUE,
     "contactPerson" TEXT,
     phone TEXT,
     email TEXT,
@@ -133,19 +162,31 @@ CREATE TABLE IF NOT EXISTS refund_transactions (
     "stockRestored" BOOLEAN
 );
 
-CREATE TABLE IF NOT EXISTS session_history (
-    id SERIAL PRIMARY KEY,
-    "isOpen" BOOLEAN,
-    "startingCash" NUMERIC,
-    "openedBy" TEXT,
-    "openedAt" TEXT,
-    activities JSONB,
-    "closingCash" NUMERIC,
-    difference NUMERIC,
-    "closedBy" TEXT,
-    "closedAt" TEXT,
-    user_id INT REFERENCES users(id) ON DELETE SET NULL
+CREATE TABLE IF NOT EXISTS cash_drawer_sessions (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  opening_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  closing_amount NUMERIC(12,2),
+  status TEXT NOT NULL DEFAULT 'open',
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at TIMESTAMPTZ,
+  opened_by TEXT,
+  closed_by TEXT,
+  difference NUMERIC
 );
+
+CREATE TABLE IF NOT EXISTS cash_drawer_activity (
+  id SERIAL PRIMARY KEY,
+  session_id INT NOT NULL REFERENCES cash_drawer_sessions(id),
+  user_id INT NOT NULL,
+  type TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  notes TEXT,
+  order_id TEXT,
+  payment_method TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 
 CREATE TABLE IF NOT EXISTS parked_orders (
     id TEXT PRIMARY KEY,
@@ -155,33 +196,27 @@ CREATE TABLE IF NOT EXISTS parked_orders (
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id SERIAL PRIMARY KEY,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    user_id INT,
-    user_name TEXT,
-    action TEXT NOT NULL,
-    entity_type TEXT,
-    entity_id TEXT,
-    details TEXT
+  id SERIAL PRIMARY KEY,
+  user_id INT NULL,
+  user_name TEXT,
+  action TEXT NOT NULL,
+  entity TEXT NULL,
+  entity_id TEXT NULL,
+  details JSONB NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS inventory_counts (
-    id SERIAL PRIMARY KEY,
-    user_id INT,
-    user_name TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    notes TEXT
+CREATE TABLE IF NOT EXISTS inventory_logs (
+  id SERIAL PRIMARY KEY,
+  product_id INT NOT NULL,
+  user_id INT NULL,
+  change_amount NUMERIC(14,4) NOT NULL,
+  new_stock NUMERIC(14,4) NOT NULL,
+  reason TEXT NOT NULL,
+  reference_id TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS inventory_count_items (
-    id SERIAL PRIMARY KEY,
-    count_id INT REFERENCES inventory_counts(id) ON DELETE CASCADE,
-    product_id INT,
-    product_name TEXT,
-    expected_stock NUMERIC,
-    counted_stock NUMERIC,
-    difference NUMERIC
-);
 
 CREATE TABLE IF NOT EXISTS auth_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -248,14 +283,9 @@ export async function seedInitialData() {
     }
 
     for (const user of MOCK_USERS) {
-        // Check for user regardless of deleted status
-        const existing = await sql`SELECT id, deleted_at FROM users WHERE username = ${user.username} LIMIT 1`;
-        if ((existing?.rowCount ?? 0) > 0) {
-            // User exists, reactivate and update them
-            await sql`UPDATE users SET name = ${user.name}, "roleId" = ${user.roleId}, password = ${user.password}, pin = ${user.pin}, "avatarUrl" = ${user.avatarUrl}, status = ${user.status}, "deleted_at" = NULL WHERE id = ${existing.rows[0].id}`;
-        } else {
-            // User does not exist, insert
-            await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status})`;
+        const existing = await sql`SELECT id FROM users WHERE username = ${user.username} AND deleted_at IS NULL LIMIT 1`;
+        if ((existing?.rowCount ?? 0) === 0) {
+           await sql`INSERT INTO users (name, "roleId", username, password, pin, "avatarUrl", status) VALUES (${user.name}, ${user.roleId}, ${user.username}, ${user.password}, ${user.pin}, ${user.avatarUrl}, ${user.status})`;
         }
     }
 
@@ -284,28 +314,45 @@ export async function ensureDbInitialized() {
         }
     }
 
-    // Patch existing databases that might be missing columns
-    await sql`ALTER TABLE session_history ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;`;
-    await sql`ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INT;`;
+    // Drop old session history if it exists
+    await sql`DROP TABLE IF EXISTS session_history;`;
 
+    // Idempotent migrations/patches for existing databases
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode TEXT;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold NUMERIC(14,4) DEFAULT 10;`;
+    
     // Drop old unique constraint and create a partial unique index for usernames
-    // This allows reusing usernames of soft-deleted users.
     await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key;`;
     await sql`DROP INDEX IF EXISTS users_username_unique_when_not_deleted;`;
-    await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_when_not_deleted ON users (username) WHERE "deleted_at" IS NULL;`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_when_not_deleted ON users (username) WHERE deleted_at IS NULL;`;
 
-    await sql`ALTER TABLE products DROP CONSTRAINT IF EXISTS products_name_key;`;
-    await sql`ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);`;
+    // Add unique constraint to product names if not exists
+    const hasPnameC = await sql`SELECT 1 FROM pg_constraint WHERE conname = 'products_name_key'`;
+    if ((hasPnameC?.rowCount ?? 0) === 0) {
+      await sql`ALTER TABLE products ADD CONSTRAINT products_name_key UNIQUE (name);`;
+    }
+    
+    // Add unique constraint to supplier names if not exists
+    const hasSnameC = await sql`SELECT 1 FROM pg_constraint WHERE conname = 'suppliers_name_key'`;
+     if ((hasSnameC?.rowCount ?? 0) === 0) {
+      await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
+    }
 
-    await sql`ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_name_key;`;
-    await sql`ALTER TABLE suppliers ADD CONSTRAINT suppliers_name_key UNIQUE (name);`;
+    const hasCashDrawerIndex = await sql`SELECT 1 FROM pg_indexes WHERE indexname = 'cash_drawer_user_open_idx'`;
+    if ((hasCashDrawerIndex?.rowCount ?? 0) === 0) {
+        await sql`
+            CREATE UNIQUE INDEX cash_drawer_user_open_idx
+            ON cash_drawer_sessions (user_id)
+            WHERE status = 'open';
+        `;
+    }
     
     await seedInitialData();
     isDbInitialized = true;
     console.log('Database initialization check complete.');
   } catch (error) {
     console.error('Error during database initialization:', error);
-    // Re-throw the error to be caught by the calling API route
     throw error;
   }
 }

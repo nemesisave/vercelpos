@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql, ensureDbInitialized } from '../_db.js';
+import { sql, ensureDbInitialized, writeAuditLog } from '../_db.js';
 import { NewUserPayload, User } from '../../types.js';
 import { db } from '@vercel/postgres';
 
@@ -8,10 +8,10 @@ async function getAuthenticatedUser(req: VercelRequest): Promise<User | null> {
     const sessionId = req.cookies.session_id;
     if (!sessionId) return null;
     const sessionResult = await sql`SELECT user_id FROM auth_sessions WHERE id = ${sessionId} AND expires_at > NOW()`;
-    if (sessionResult.rowCount === 0) return null;
+    if ((sessionResult?.rowCount ?? 0) === 0) return null;
     const userId = sessionResult.rows[0].user_id;
-    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND "deleted_at" IS NULL`;
-    if (userResult.rowCount === 0) return null;
+    const userResult = await sql`SELECT id, name, "roleId", username, "avatarUrl", status, "lastLogin" FROM users WHERE id = ${userId} AND deleted_at IS NULL`;
+    if ((userResult?.rowCount ?? 0) === 0) return null;
     return userResult.rows[0] as User;
 }
 
@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Check for existing active user with the same username
     const existingUserCheck = await client.query(
-      `SELECT id FROM users WHERE username = $1 AND "deleted_at" IS NULL`,
+      `SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL`,
       [username]
     );
 
@@ -54,16 +54,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       [name, username, password, pin, roleId, `https://i.pravatar.cc/150?u=${username}`]
     );
     const newUser = result.rows[0];
-    delete newUser.password;
-
-    await client.query(
-      `INSERT INTO audit_logs (user_id, user_name, action, details)
-       VALUES ($1, $2, 'CREATE_USER', $3);`,
-      [creator.id, creator.name, `Created new user: ${newUser.name} (@${newUser.username})`]
-    );
+    
+    await writeAuditLog({
+      userId: creator.id,
+      userName: creator.name,
+      action: 'CREATE_USER',
+      entity: 'users',
+      entityId: newUser.id,
+      details: { name: newUser.name, username: newUser.username, roleId: newUser.roleId }
+    });
 
     await client.query('COMMIT');
-    res.status(201).json(newUser);
+    const { password: _, ...safeUser } = newUser;
+    res.status(201).json(safeUser);
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error adding user:', error);
