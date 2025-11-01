@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureDbInitialized, sql, writeAuditLog } from '../_db.js';
+import { ensureDbInitialized, sql, writeAuditLog, writeSessionHistory } from '../_db.js';
 import { db } from '@vercel/postgres';
 import { User } from '../../types.js';
 
@@ -54,6 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         userName: user.name,
         action: 'OPEN_CASH_DRAWER',
         details: { sessionId: newSession.id, opening_amount }
+    });
+    
+    await writeSessionHistory({
+      userId: user.id,
+      drawerSessionId: newSession.id,
+      action: 'open',
+      openingAmount: newSession.opening_amount,
+      notes: `Session opened by ${user.name}`
     });
     
     await client.query('COMMIT');

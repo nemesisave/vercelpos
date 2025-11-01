@@ -11,6 +11,56 @@ if (!process.env.DATABASE_URL) {
 // Use the vercelSql export for general queries, as it handles connection pooling.
 export const sql = vercelSql;
 
+export async function writeSessionHistory(entry: {
+  userId: number;
+  drawerSessionId?: number;
+  action: string;
+  amount?: number | null;
+  openingAmount?: number | null;
+  closingAmount?: number | null;
+  difference?: number | null;
+  notes?: string | null;
+}) {
+  const {
+    userId,
+    drawerSessionId = null,
+    action,
+    amount = null,
+    openingAmount = null,
+    closingAmount = null,
+    difference = null,
+    notes = null,
+  } = entry;
+
+  try {
+    await sql`
+      INSERT INTO session_history (
+        user_id,
+        drawer_session_id,
+        action,
+        amount,
+        opening_amount,
+        closing_amount,
+        difference,
+        notes
+      )
+      VALUES (
+        ${userId},
+        ${drawerSessionId},
+        ${action},
+        ${amount},
+        ${openingAmount},
+        ${closingAmount},
+        ${difference},
+        ${notes}
+      )
+    `;
+  } catch (e) {
+    console.error("Failed to write session history:", e);
+    // Don't re-throw, this is an audit/log table
+  }
+}
+
 export async function writeAuditLog(opts: {
   userId?: number;
   userName?: string;
@@ -187,6 +237,18 @@ CREATE TABLE IF NOT EXISTS cash_drawer_activity (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS session_history (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL,
+  drawer_session_id INT NULL,
+  action TEXT NOT NULL,
+  amount NUMERIC(12,2) NULL,
+  opening_amount NUMERIC(12,2) NULL,
+  closing_amount NUMERIC(12,2) NULL,
+  difference NUMERIC(12,2) NULL,
+  notes TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS parked_orders (
     id TEXT PRIMARY KEY,
@@ -313,9 +375,6 @@ export async function ensureDbInitialized() {
             await sql.query(statement);
         }
     }
-
-    // Drop old session history if it exists
-    await sql`DROP TABLE IF EXISTS session_history;`;
 
     // Idempotent migrations/patches for existing databases
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`;

@@ -40,7 +40,7 @@ export default async function handler(
       sql`SELECT * FROM purchase_orders ORDER BY date DESC`,
       sql`SELECT * FROM completed_orders ORDER BY date DESC`,
       sql`SELECT * FROM refund_transactions ORDER BY date DESC`,
-      sql`SELECT * FROM session_history ORDER BY id DESC`,
+      sql`SELECT * FROM cash_drawer_sessions ORDER BY opened_at DESC`,
       sql`SELECT * FROM audit_logs ORDER BY id DESC`,
       sql`SELECT * FROM currencies ORDER BY code ASC`,
       sql`SELECT * FROM parked_orders ORDER BY "parkedAt" DESC`,
